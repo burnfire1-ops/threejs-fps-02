@@ -20,6 +20,14 @@ export const PAL = {
   steam: 0xcfd6da,
   siteA: 0xf0a830,
   siteB: 0x3ec6b8,
+  // Container-yard paint (v6-visual): cover props wear saturated
+  // container colours — teal, rust, olive, mustard, brick, slate —
+  // like a bright outdoor container yard, instead of one flat grey.
+  // The dusk sky and the amber/teal site accents stay, so the palette
+  // stays coherent with v6-full.
+  container: [0x2e7f7a, 0xa85a2a, 0x6b7a3a, 0xc9a227, 0x9a4a38, 0x4a6b8a],
+  hazard: 0xd8b400,
+  trimDark: 0x24282e,
 };
 export const CSS = {
   canvas: '#14161a', surface: '#1e2228', hairline: '#2c323a',

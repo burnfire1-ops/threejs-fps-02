@@ -23,19 +23,55 @@ const _origin = new THREE.Vector3();
 const _aim = new THREE.Vector3();
 
 function makeMesh(team) {
+  // Humanoid low-poly (v6-visual): capsule torso, sphere head with a
+  // visor slit, shoulder pads, capsule arms angled forward to hold the
+  // gun, capsule legs. The torso keeps the old body box's bounding box
+  // (0.55 wide, y 0.44..1.46) and the head keeps the old 0.32 cube's
+  // diameter, so the shootable hitbox is the same shape in the same
+  // place — only the silhouette changes. Arms/legs/visor/pads are
+  // visual only and are never added to G.shootables.
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: team === 'atk' ? 0x8a6f3c : 0x2e6f6a, roughness: 0.8 });
-  const headMat = new THREE.MeshStandardMaterial({ color: team === 'atk' ? 0xc9a24d : 0x4d9a92, roughness: 0.7 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.0, 0.32), bodyMat);
+  const suit = team === 'atk' ? 0x8a6f3c : 0x2e6f6a;
+  const suitDark = team === 'atk' ? 0x5d4a26 : 0x1e4a45;
+  const skin = team === 'atk' ? 0xc9a24d : 0x4d9a92;
+  const accent = team === 'atk' ? 0xf0a830 : 0x3ec6b8;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: suit, roughness: 0.75 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.8 });
+  const headMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.65 });
+  const accMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5, emissive: accent, emissiveIntensity: 0.3 });
+  const gunMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.5 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.5, 4, 10), bodyMat);
   body.position.y = 0.95;
   body.castShadow = true;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), headMat);
-  head.position.y = 1.6;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), headMat);
+  head.position.y = 1.62;
   head.castShadow = true;
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.5 }));
-  gun.position.set(0.2, 1.25, -0.3);
-  g.add(body, head, gun);
-  return { group: g, body, head };
+  // Visor slit on the face (bots face local -z).
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.06), accMat);
+  visor.position.set(0, 1.64, -0.15);
+  const padGeo = new THREE.SphereGeometry(0.11, 8, 6);
+  const padL = new THREE.Mesh(padGeo, accMat);
+  padL.position.set(-0.3, 1.38, 0);
+  const padR = new THREE.Mesh(padGeo, accMat);
+  padR.position.set(0.3, 1.38, 0);
+  // Arms angled forward-down toward the gun; base pitch -0.85.
+  const armGeo = new THREE.CapsuleGeometry(0.07, 0.34, 4, 8);
+  const armL = new THREE.Mesh(armGeo, darkMat);
+  armL.position.set(-0.3, 1.12, -0.16);
+  armL.rotation.set(-0.85, 0, 0.25);
+  const armR = new THREE.Mesh(armGeo, darkMat);
+  armR.position.set(0.3, 1.12, -0.18);
+  armR.rotation.set(-0.85, 0, -0.25);
+  // Legs, feet on the ground.
+  const legGeo = new THREE.CapsuleGeometry(0.09, 0.38, 4, 8);
+  const legL = new THREE.Mesh(legGeo, darkMat);
+  legL.position.set(-0.13, 0.28, 0);
+  const legR = new THREE.Mesh(legGeo, darkMat);
+  legR.position.set(0.13, 0.28, 0);
+  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.55), gunMat);
+  gun.position.set(0.18, 1.22, -0.32);
+  g.add(body, head, visor, padL, padR, armL, armR, legL, legR, gun);
+  return { group: g, body, head, legL, legR, armL, armR };
 }
 
 export function createBots(G) {
@@ -44,14 +80,14 @@ export function createBots(G) {
   for (const team of ['atk', 'def']) {
     const names = CFG.botNames[team];
     for (let i = 0; i < names.length; i++) {
-      const { group, body, head } = makeMesh(team);
+      const { group, body, head, legL, legR, armL, armR } = makeMesh(team);
       const b = {
         id: id++, team, isPlayer: false, name: names[i],
         pos: new THREE.Vector3(), vel: new THREE.Vector3(),
         yaw: 0, pitch: 0, hp: CFG.player.hp, armor: 0, alive: true, kills: 0, deaths: 0,
         money: 0, kit: false, grenades: { he: 0, smoke: 0 },
         weapons: {}, cur: 'pistol', bloom: 0,
-        mesh: group, state: 'route', path: [], pathI: 0,
+        mesh: group, legL, legR, armL, armR, state: 'route', path: [], pathI: 0,
         destNode: SPAWN_NODE[team], pathDest: null, holdT: 0, thinkT: G.rng() * 0.15,
         target: null, reactT: 0, burstLeft: 0, burstPause: 0, cool: 0,
         // Preallocated perception memory (v6-full, fix 5): lastSeen and
@@ -374,6 +410,15 @@ export function stepBots(G, dt) {
     moveBot(G, b, dt);
     b.mesh.position.copy(b.pos);
     b.mesh.rotation.y = b.yaw;
+    // Walk cycle (v6-visual): legs swing while moving, arms counter-swing
+    // around their held-gun pose. Pure trig on existing state — no
+    // allocation, no gameplay effect; idle bots return to the base pose.
+    const spd = Math.hypot(b.vel.x, b.vel.z);
+    const sw = spd > 0.5 ? Math.sin(G.time * 9 + b.id * 1.7) * 0.5 : 0;
+    b.legL.rotation.x = sw;
+    b.legR.rotation.x = -sw;
+    b.armL.rotation.x = -0.85 - sw * 0.5;
+    b.armR.rotation.x = -0.85 + sw * 0.5;
   }
 }
 
