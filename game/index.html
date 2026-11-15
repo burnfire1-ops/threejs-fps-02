@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STEAMWORKS — Tactical FPS</title>
+<style>
+  :root { --ink:#e9e6df; --muted:#98a0a8; --accent:#f0a830; --teal:#3ec6b8; --red:#ff4444; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#14161a; font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--ink); }
+  #app, #app canvas { width:100%; height:100%; display:block; }
+  #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }
+  /* Crosshair: four ticks whose gap follows spread. */
+  #crosshair { position:absolute; left:50%; top:50%; width:0; height:0; --gap:8px; }
+  #crosshair i { position:absolute; background:var(--ink); box-shadow:0 0 2px #000; }
+  #crosshair i:nth-child(1){ left:-1px; top:calc(-1 * var(--gap) - 7px); width:2px; height:7px; }
+  #crosshair i:nth-child(2){ left:-1px; top:var(--gap); width:2px; height:7px; }
+  #crosshair i:nth-child(3){ top:-1px; left:calc(-1 * var(--gap) - 7px); width:7px; height:2px; }
+  #crosshair i:nth-child(4){ top:-1px; left:var(--gap); width:7px; height:2px; }
+  #crosshair b { position:absolute; left:-1.5px; top:-1.5px; width:3px; height:3px; background:var(--ink); border-radius:50%; }
+  #hitmarker { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(45deg); font-size:22px; opacity:0; color:#fff; text-shadow:0 0 3px #000; }
+  #dmg { position:absolute; inset:0; box-shadow:inset 0 0 90px 30px rgba(255,40,40,.55); opacity:0; }
+  #dmgdir { position:absolute; left:50%; top:50%; width:150px; height:150px; margin:-75px 0 0 -75px; border-radius:50%; border-top:6px solid var(--red); opacity:0; }
+  .panel { background:rgba(20,22,26,.78); border:1px solid #2c323a; border-radius:4px; padding:8px 10px; }
+  #vitals { position:absolute; left:16px; bottom:16px; min-width:210px; }
+  #vitals .row { display:flex; justify-content:space-between; gap:10px; font-size:14px; }
+  #hp-num { font-size:26px; font-weight:700; }
+  .bar { height:5px; background:#2c323a; border-radius:2px; overflow:hidden; margin:3px 0 6px; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  #armor-bar i { background:var(--teal); }
+  #ammo { position:absolute; right:16px; bottom:16px; text-align:right; }
+  #ammo-mag { font-size:30px; font-weight:700; }
+  #ammo-res { font-size:15px; color:var(--muted); }
+  #weapon-name { font-size:12px; color:var(--muted); letter-spacing:1px; }
+  #topbar { position:absolute; top:12px; left:50%; transform:translateX(-50%); text-align:center; }
+  #timer { font-size:24px; font-weight:700; }
+  #score-line { font-size:14px; letter-spacing:1px; }
+  #round-label { font-size:11px; color:var(--muted); letter-spacing:2px; }
+  #money { position:absolute; left:16px; top:12px; font-size:18px; font-weight:700; color:var(--accent); }
+  #bomb-status { position:absolute; left:16px; top:44px; font-size:12px; letter-spacing:1px; }
+  #killfeed { position:absolute; right:16px; top:186px; text-align:right; font-size:13px; line-height:1.5; }
+  #killfeed .kf-me { color:var(--accent); }
+  #radio { position:absolute; right:16px; bottom:110px; text-align:right; font-size:12px; line-height:1.6; color:var(--muted); }
+  #radio .radio-atk { color:#f0c060; }
+  #radio .radio-def { color:#7fd8cf; }
+  #banner { position:absolute; left:50%; top:26%; transform:translateX(-50%); font-size:26px; font-weight:700; letter-spacing:2px; text-shadow:0 2px 8px #000; display:none; }
+  #progress { position:absolute; left:50%; top:58%; transform:translateX(-50%); width:260px; display:none; text-align:center; }
+  #progress-label { font-size:12px; letter-spacing:2px; margin-bottom:4px; }
+  #progress .bar { height:8px; }
+  #progress-fill { background:var(--accent); }
+  #minimap { position:absolute; right:16px; top:12px; border:1px solid #2c323a; border-radius:4px; background:#101216; }
+  #toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); font-size:13px; color:var(--accent); text-shadow:0 1px 3px #000; }
+  #buy-hint { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); font-size:13px; color:var(--muted); display:none; }
+  #buymenu { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:420px; display:none; pointer-events:none; }
+  #buymenu h2 { font-size:15px; letter-spacing:2px; margin-bottom:2px; }
+  #buy-money { font-size:18px; color:var(--accent); margin-bottom:8px; }
+  .buy-item { display:flex; justify-content:space-between; font-size:13px; padding:5px 6px; border-bottom:1px solid #22262b; }
+  .buy-item b { color:var(--accent); width:18px; display:inline-block; }
+  .buy-item span { color:var(--muted); }
+  .buy-item.owned span { color:var(--teal); }
+  #scoreboard { position:absolute; left:50%; top:16%; transform:translateX(-50%); width:460px; display:none; z-index:6; }
+  #scoreboard h2 { font-size:14px; letter-spacing:2px; margin-bottom:6px; }
+  .sb-row { display:flex; justify-content:space-between; font-size:13px; padding:3px 4px; }
+  .sb-row span { flex:1; } .sb-row span:last-child { text-align:right; }
+  .sb-me { color:var(--accent); }
+  .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:rgba(10,11,13,.72); pointer-events:auto; text-align:center; z-index:5; }
+  .overlay h1 { font-size:44px; letter-spacing:8px; }
+  .overlay h1 span { color:var(--accent); }
+  .overlay p { color:var(--muted); font-size:14px; max-width:520px; line-height:1.7; }
+  .overlay .keys { font-size:12px; color:var(--muted); line-height:1.9; }
+  .overlay .cta { font-size:16px; color:var(--accent); letter-spacing:2px; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+  #end-title { font-size:30px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <div id="dmg"></div>
+  <div id="dmgdir"></div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="hitmarker">✕</div>
+  <div id="vitals" class="panel">
+    <div class="row"><span>HEALTH <b id="hp-num">100</b></span><span>ARMOR <b id="armor-num">0</b></span></div>
+    <div class="bar"><i id="hp-bar" style="width:100%"></i></div>
+    <div class="bar"><i id="armor-bar" style="width:0%"></i></div>
+  </div>
+  <div id="ammo" class="panel">
+    <div><span id="ammo-mag">12</span><span id="ammo-res"> / 36</span></div>
+    <div id="weapon-name">P9 Sidearm</div>
+  </div>
+  <div id="topbar"><div id="timer">1:40</div><div id="score-line">EMBER 0 — 0 ASH</div><div id="round-label">ROUND 1</div></div>
+  <div id="money">$800</div>
+  <div id="bomb-status"></div>
+  <canvas id="minimap" width="160" height="160"></canvas>
+  <div id="killfeed"></div>
+  <div id="radio"></div>
+  <div id="banner"></div>
+  <div id="progress"><div id="progress-label">PLANTING…</div><div class="bar"><i id="progress-fill" style="width:0%"></i></div></div>
+  <div id="toast"></div>
+  <div id="buy-hint">Press B to open the buy menu</div>
+  <div id="buymenu" class="panel"><h2>BUY MENU</h2><div id="buy-money">$800</div><div id="buy-grid"></div></div>
+  <div id="scoreboard" class="panel"><h2>SCOREBOARD — STEAMWORKS</h2><div id="scoreboard-body"></div></div>
+  <div id="overlay" class="overlay">
+    <h1>STEAM<span>WORKS</span></h1>
+    <p>A decommissioned geothermal plant. Two crews, one charge. Ember attacks, Ash holds. First to 8 rounds takes the match — plant the charge at Turbine Hall or Cooling Tower, or wipe the other crew out.</p>
+    <div class="keys">WASD move · Mouse aim · Click shoot · Right-click aim · R reload · B buy · E plant / defuse · G grenade · 1-6 weapons · Ctrl crouch · Space jump · Tab scoreboard · M mute</div>
+    <div class="cta">CLICK TO PLAY</div>
+  </div>
+  <div id="endoverlay" class="overlay" style="display:none">
+    <h1 id="end-title"></h1>
+    <p id="end-score"></p>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
