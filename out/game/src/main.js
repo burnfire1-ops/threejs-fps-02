@@ -10,7 +10,7 @@ import { createPlayer, createPlayerHitbox, giveWeapon, stepPlayer } from './play
 import { createViewModel, tryFire, stepReloads, stepViewModel, switchWeapon, startReload, currentSpread } from './weapon.js';
 import { createBots, stepBots } from './bots.js';
 import { createBomb, stepBomb, stepPlayerInteract, plantBomb, defuseBomb } from './bomb.js';
-import { createRounds, startRound, stepRounds, endRound } from './rounds.js';
+import { createRounds, startRound, stepRounds, endRound, rematch } from './rounds.js';
 import { buyItem } from './economy.js';
 import { stepGrenades, throwGrenade } from './grenade.js';
 import { initHud, stepHud } from './hud.js';
@@ -91,7 +91,8 @@ initHud();
 bindInput(G, renderer.domElement);
 
 // --- input callbacks (input.js only forwards DOM events) ---
-G.onReload = () => startReload(G, G.player);
+// R reloads, except at match end, where the end screen promises a rematch.
+G.onReload = () => { if (G.round.state === 'over') rematch(G); else startReload(G, G.player); };
 G.onBuyToggle = () => { if (G.round.state === 'freeze') G.buyOpen = !G.buyOpen; };
 G.onGrenade = () => {
   const p = G.player;
