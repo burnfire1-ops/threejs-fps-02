@@ -230,13 +230,17 @@ export function stepBots(G, dt) {
       // Attackers guard the planted bomb.
       if (b.state !== 'engage') { b.state = 'hold'; b.destNode = bomb.site === 'A' ? SITE_NODE.A : SITE_NODE.B; }
     } else if (b.team === 'def' && bomb.state === 'planted') {
-      const siteNode = bomb.site === 'A' ? SITE_NODE.A : SITE_NODE.B;
       const d = Math.hypot(b.pos.x - bomb.pos.x, b.pos.z - bomb.pos.z);
       if (d < 1.6 && b.state !== 'engage') {
         b.state = 'defuse';
       } else if (b.state !== 'engage' && b.state !== 'defuse') {
         b.state = 'route';
-        setDest(G, b, siteNode);
+        // Route to the node nearest the bomb, not the site node. The carrier
+        // plants wherever it stands inside the 6x6 site, up to 4.2 m from
+        // the site node, and routing to the site node alone left defenders
+        // oscillating route<->hold at the node, never within the 1.6 m
+        // defuse range.
+        setDest(G, b, nearestNode(bomb.pos.x, bomb.pos.z));
       }
     } else if (b.team === 'atk' && bomb.carrier === b && bomb.state === 'carried') {
       if (b.state !== 'engage' && b.state !== 'plant') {
@@ -282,7 +286,15 @@ export function stepBots(G, dt) {
       b.vel.set(Math.cos(b.yaw) * b.strafe * 0.9, 0, -Math.sin(b.yaw) * b.strafe * 0.9);
       if (b.reactT <= 0 && G.round.state === 'live') botShoot(G, b, dt);
     } else if (b.state === 'route') {
-      if (b.pathI < b.path.length) {
+      // Defender closing on a planted bomb: once close, steer straight at
+      // the bomb instead of the next path node. The nearest node can still
+      // sit >1.6 m from an off-centre plant, so node routing alone cannot
+      // close the last metres; the direct walk finishes the job and there
+      // is no route<->hold oscillation at the site node.
+      if (b.team === 'def' && bomb.state === 'planted'
+          && Math.hypot(b.pos.x - bomb.pos.x, b.pos.z - bomb.pos.z) < 6) {
+        moveToward(G, b, bomb.pos.x, bomb.pos.z, dt, CFG.bot.walk);
+      } else if (b.pathI < b.path.length) {
         const n = nodePos(b.path[b.pathI], _tmp);
         if (moveToward(G, b, n.x, n.z, dt, CFG.bot.walk)) b.pathI++;
       } else {
