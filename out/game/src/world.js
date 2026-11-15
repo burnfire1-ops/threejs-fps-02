@@ -29,10 +29,10 @@ const COVER = [
   [-12, -2, 1.6, 1.6, 1.2], [12, -2, 1.6, 1.6, 1.2],
   // Attacker yard
   [-6, 15, 2, 1.4, 1.2], [6, 15, 2, 1.4, 1.2],
-  // Site A turbine block + crates
-  [-14, -15, 4, 3, 2.2], [-10.5, -14.5, 1.4, 1.4, 1.1], [-16.5, -10, 1.4, 1.4, 1.1],
-  // Site B tower base + crates
-  [14, -15, 4, 4, 2.6], [10.5, -14.5, 1.4, 1.4, 1.1], [16.5, -10, 1.4, 1.4, 1.1],
+  // Site A turbine block + crates (turbine block wears the warm accent).
+  [-14, -15, 4, 3, 2.2, PAL.turbine], [-10.5, -14.5, 1.4, 1.4, 1.1], [-16.5, -10, 1.4, 1.4, 1.1],
+  // Site B tower base + crates (tower base wears the cool accent).
+  [14, -15, 4, 4, 2.6, PAL.coolant], [10.5, -14.5, 1.4, 1.4, 1.1], [16.5, -10, 1.4, 1.4, 1.1],
   // Defender yard
   [0, -17, 2, 1.4, 1.2],
 ];
@@ -68,15 +68,21 @@ export function createWorld(scene) {
   addBox(0, 20, 41, 1, 4.6, PAL.wall);
   addBox(-20, 0, 1, 41, 4.6, PAL.wall);
   addBox(20, 0, 1, 41, 4.6, PAL.wall);
-  for (const [cx, cz, w, d, h] of WALLS) addBox(cx, cz, w, d, h, PAL.wall);
-  for (const [cx, cz, w, d, h] of COVER) addBox(cx, cz, w, d, h, PAL.wallTop);
+  // Walls alternate two close shades so the long runs read as panels,
+  // not one flat slab (v6-full, fix 3; geometry and colliders unchanged).
+  WALLS.forEach(([cx, cz, w, d, h], i) => addBox(cx, cz, w, d, h, i % 2 ? PAL.wallAlt : PAL.wall));
+  for (const [cx, cz, w, d, h, col] of COVER) addBox(cx, cz, w, d, h, col ?? PAL.wallTop);
   // Turbine (site A): warm block + spinning drum visual; Cooling tower (site B).
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 3.4, 12), mat(PAL.turbine));
+  // Both glow faintly from within (v6-full, fix 3): the sites read as
+  // machines, not grey boxes.
+  const drumMat = new THREE.MeshStandardMaterial({ color: PAL.turbine, roughness: 0.55, metalness: 0.4, emissive: 0x7a4d08, emissiveIntensity: 0.5 });
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 3.4, 12), drumMat);
   drum.rotation.z = Math.PI / 2;
   drum.position.set(-14, 3.6, -15);
   drum.castShadow = true;
   group.add(drum);
-  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 5.5, 12, 1, true), mat(PAL.coolant));
+  const towerMat = new THREE.MeshStandardMaterial({ color: PAL.coolant, roughness: 0.6, metalness: 0.3, emissive: 0x0a3d38, emissiveIntensity: 0.6 });
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 5.5, 12, 1, true), towerMat);
   tower.position.set(14, 2.75, -15);
   group.add(tower);
   // Pipes along the west and east walls (visual, above head height).
@@ -102,18 +108,42 @@ export function createWorld(scene) {
     strip.position.set(s.center.x, 0.05, s.center.z - s.size / 2);
     group.add(strip);
   }
+  // Lane guide strips (v6-full, fix 3): flat floor paint along the three
+  // lanes, tinted by the site they lead to. Visual only (flat planes, no
+  // colliders, no solids): they cannot block movement or bullets.
+  const laneMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.07, depthWrite: false });
+  for (const [x, c] of [[-16, PAL.siteA], [0, 0xcfd6da], [16, PAL.siteB]]) {
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 21), laneMat(c));
+    lane.rotation.x = -Math.PI / 2;
+    lane.position.set(x, 0.015, 1.5);
+    group.add(lane);
+  }
+  // Site corner brackets (v6-full, fix 3): flat floor paint marking the
+  // plant zone corners, in the site colour. Visual only.
+  for (const s of Object.values(sites)) {
+    for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) {
+      const corner = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7),
+        new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.4, depthWrite: false }));
+      corner.rotation.x = -Math.PI / 2;
+      corner.position.set(s.center.x + dx, 0.025, s.center.z + dz);
+      group.add(corner);
+    }
+  }
   // Steam vents: translucent puffs that pulse (animated in main loop).
-  const steamMat = new THREE.MeshBasicMaterial({ color: PAL.steam, transparent: true, opacity: 0.08, depthWrite: false });
+  const steamMat = new THREE.MeshBasicMaterial({ color: PAL.steam, transparent: true, opacity: 0.12, depthWrite: false });
   const steam = [];
-  for (const [x, z, s] of [[-14, -13, 2.2], [14, -13, 2.6], [-16, 4, 1.4], [16, 4, 1.4], [0, -2, 1.6]]) {
+  for (const [x, z, s] of [[-14, -13, 2.2], [14, -13, 2.6], [-16, 4, 1.4], [16, 4, 1.4], [0, -2, 1.6], [0, 8, 1.6], [-6, 15, 1.4]]) {
     const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 8), steamMat.clone());
     puff.position.set(x, 1.6, z);
     group.add(puff);
     steam.push(puff);
   }
   // Lighting: hemisphere + warm key with shadows + two site point lights.
-  scene.add(new THREE.HemisphereLight(0x8fa3b8, 0x1a1c20, 1.15));
-  const sun = new THREE.DirectionalLight(0xffd9a0, 2.0);
+  // v6-full (fix 3): brighter overall, plus a warm mid-lane lamp and a
+  // cool attacker-yard lamp so the dark middle and south stop reading
+  // as black voids.
+  scene.add(new THREE.HemisphereLight(0x8fa3b8, 0x1a1c20, 1.6));
+  const sun = new THREE.DirectionalLight(0xffd9a0, 2.6);
   sun.position.set(18, 26, 10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -121,12 +151,18 @@ export function createWorld(scene) {
   sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
   sun.shadow.camera.far = 70;
   group.add(sun);
-  const lampA = new THREE.PointLight(PAL.siteA, 18, 16);
+  const lampA = new THREE.PointLight(PAL.siteA, 26, 16);
   lampA.position.set(-13, 3.4, -12);
   group.add(lampA);
-  const lampB = new THREE.PointLight(PAL.siteB, 18, 16);
+  const lampB = new THREE.PointLight(PAL.siteB, 26, 16);
   lampB.position.set(13, 3.4, -12);
   group.add(lampB);
+  const lampMid = new THREE.PointLight(0xffd9a0, 12, 14);
+  lampMid.position.set(0, 3.4, 4);
+  group.add(lampMid);
+  const lampYard = new THREE.PointLight(PAL.siteB, 10, 12);
+  lampYard.position.set(0, 3.4, 16);
+  group.add(lampYard);
   scene.add(group);
   scene.fog = new THREE.Fog(PAL.canvas, 30, 75);
   const spawns = {

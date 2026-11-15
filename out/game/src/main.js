@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { CFG } from './config.js';
 import { PAL } from './palette.js';
 import { createWorld } from './world.js';
-import { createPlayer, giveWeapon, stepPlayer } from './player.js';
+import { createPlayer, createPlayerHitbox, giveWeapon, stepPlayer } from './player.js';
 import { createViewModel, tryFire, stepReloads, stepViewModel, switchWeapon, startReload, currentSpread } from './weapon.js';
 import { createBots, stepBots } from './bots.js';
 import { createBomb, stepBomb, stepPlayerInteract, plantBomb, defuseBomb } from './bomb.js';
@@ -37,6 +37,10 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Filmic tone mapping (v6-full, fix 3): lifts the flat grey-box look
+// without touching any geometry.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -53,12 +57,16 @@ const G = {
   killFeed: [], radio: [],
   hudHit: null, hudHitT: 0, dmgFlash: 0, dmgDir: 0, dmgDirT: 0,
   econFlash: 0, toast: '', toastT: 0, spreadNow: 0.01, playerDied: false,
+  spectate: null, // v6-full: the living teammate the dead player watches
   world: null, player: null, bots: [], agents: [], viewModel: null, bomb: null, round: null,
   // Bots hear shots and deaths through this (radius in metres).
   noise(pos, r) {
     for (const b of G.bots) {
       if (!b.alive || b.pos.distanceTo(pos) > r) continue;
-      b.heardPos = pos.clone();
+      // Preallocated copy (v6-full, fix 5): the old pos.clone() allocated
+      // one vector per hearing bot per noise event.
+      b.heardPos.copy(pos);
+      b.heard = true;
       b.heardT = 0;
       if (b.state === 'hold' || b.state === 'route') b.state = 'react';
     }
@@ -70,6 +78,7 @@ const G = {
 
 G.world = createWorld(scene);
 G.player = createPlayer(G.world, 'atk');
+createPlayerHitbox(G, G.player);
 giveWeapon(G.player, 'pistol');
 G.player.cur = 'pistol';
 G.bots = createBots(G);
@@ -129,11 +138,13 @@ function step(dt) {
   for (const m of G.radio) m.t -= dt;
   for (let i = G.radio.length - 1; i >= 0; i--) if (G.radio[i].t <= 0) G.radio.splice(i, 1);
   for (let i = G.pings.length - 1; i >= 0; i--) if (G.time - G.pings[i].t > 2.5) G.pings.splice(i, 1);
-  // Steam breathes.
-  G.world.steam.forEach((s, i) => {
+  // Steam breathes. Plain for loop (v6-full, fix 5): the old forEach
+  // arrow allocated a closure object on every fixed step.
+  for (let i = 0; i < G.world.steam.length; i++) {
+    const s = G.world.steam[i];
     const k = 1 + 0.18 * Math.sin(G.time * 0.9 + i * 1.7);
     s.scale.set(k, k * 0.6 * (1 + 0.1 * Math.sin(G.time * 0.6 + i)), k);
-  });
+  }
   if (G.world.drum) G.world.drum.rotateY(dt * 1.2);
   if (G.menuOpen || G.round.state === 'over') return;
   stepPlayer(G, dt);

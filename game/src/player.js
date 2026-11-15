@@ -18,7 +18,35 @@ export function createPlayer(world, team = 'atk') {
     weapons: {}, cur: 'pistol',
     crouching: false, aiming: false, onGround: true,
     eyeH: CFG.player.eyeStand, fov: 70,
+    // Recoil recovery (v6-full): the kick from each shot accumulates in
+    // recoilPitch/recoilYaw instead of permanently moving the aim, and
+    // decays back toward zero shortly after the last shot.
+    recoilPitch: 0, recoilYaw: 0, lastShotT: -99,
   };
+}
+
+// Player hitbox (v6-full, fix 4): the shared hitscan raycasts
+// G.shootables, and the player was never in it — only bot body/head
+// meshes were. The probability-roll botShoot in v5 damaged the target
+// directly, so nobody noticed; the moment bots fire the shared hitscan,
+// their rays pass straight through the player and hit nothing. The
+// hitbox is invisible (colorWrite/depthWrite off, so it draws nothing
+// but still raycasts) and follows the player, shrinking when crouched.
+export function createPlayerHitbox(G, p) {
+  const mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.0, 0.32), mat);
+  body.position.y = 0.95;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), mat);
+  head.position.y = 1.6;
+  body.userData = { agent: p, part: 'torso' };
+  head.userData = { agent: p, part: 'head' };
+  g.add(body, head);
+  g.position.copy(p.pos);
+  G.scene.add(g);
+  G.shootables.push(body, head);
+  p.hitbox = g;
+  return g;
 }
 
 // Give the player a weapon's ammo state (called on spawn / on buy).
@@ -30,7 +58,25 @@ export function giveWeapon(p, key) {
 export function stepPlayer(G, dt) {
   const p = G.player;
   const inp = G.input;
-  if (!p.alive || G.round.state === 'post') return;
+  if (!p.alive) {
+    // Spectator camera (v6-full): follow a living teammate instead of
+    // freezing at the death spot. When the watched bot dies, move to the
+    // next living teammate; if none is alive, the camera stays put. This
+    // is presentation only: the sim, death rules and round flow are
+    // untouched.
+    let t = G.spectate;
+    if (!t || !t.alive || t.team !== p.team) {
+      t = G.bots.find((b) => b.team === p.team && b.alive) ?? null;
+      G.spectate = t;
+    }
+    if (t) {
+      const cam = G.camera;
+      cam.position.set(t.pos.x, t.pos.y + t.eyeH, t.pos.z);
+      cam.rotation.set(0, t.yaw, 0, 'YXZ');
+    }
+    return;
+  }
+  if (G.round.state === 'post') return;
   const c = CFG.player;
   // Freeze time: no movement (CS freeze), but the player can still look
   // around and use the buy menu.
@@ -68,13 +114,34 @@ export function stepPlayer(G, dt) {
   p.yaw -= inp.mouseDX * 0.0022;
   p.pitch = Math.max(-1.5, Math.min(1.5, p.pitch - inp.mouseDY * 0.0022));
   inp.mouseDX = 0; inp.mouseDY = 0;
+  // Recoil recovery: once the player has stopped firing for a beat, the
+  // accumulated kick decays back toward the pre-shot aim. During a spray
+  // the delay never elapses, so recoil still climbs shot after shot
+  // exactly like v5; only the permanent offset is gone.
+  if (G.time - p.lastShotT > 0.12) {
+    const rec = Math.exp(-dt * 4);
+    p.recoilPitch *= rec;
+    p.recoilYaw *= rec;
+    if (Math.abs(p.recoilPitch) < 0.0002) p.recoilPitch = 0;
+    if (Math.abs(p.recoilYaw) < 0.0002) p.recoilYaw = 0;
+  }
   // Eye height eases between stand and crouch.
   const targetEye = p.crouching ? c.eyeCrouch : c.eyeStand;
   p.eyeH += (targetEye - p.eyeH) * Math.min(1, dt * 12);
-  // Camera follows the eyes; FOV eases when aiming.
+  // Camera follows the eyes; FOV eases when aiming. The recoil offset
+  // rides on top of the mouse aim and recovers with it.
   const cam = G.camera;
   cam.position.set(p.pos.x, p.pos.y + p.eyeH, p.pos.z);
-  cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ');
+  cam.rotation.set(
+    Math.max(-1.5, Math.min(1.5, p.pitch + p.recoilPitch)),
+    p.yaw + p.recoilYaw, 0, 'YXZ');
+  // The invisible hitbox follows the player and shrinks when crouched,
+  // so bot hitscan (and the player's own shots, which skip the shooter)
+  // see the same body the bots do.
+  if (p.hitbox) {
+    p.hitbox.position.copy(p.pos);
+    p.hitbox.scale.set(1, p.eyeH / c.eyeStand, 1);
+  }
   const targetFov = p.aiming ? 45 : 70;
   if (Math.abs(cam.fov - targetFov) > 0.1) {
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 10);

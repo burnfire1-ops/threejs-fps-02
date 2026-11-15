@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { CFG } from './config.js';
 import { giveWeapon } from './player.js';
 import { damageAgent } from './combat.js';
+import { hitscanShot, currentSpread } from './weapon.js';
 import { playShot } from './audio.js';
 import { losBlocked, resolveMove } from './world.js';
 import { nearestNode, findPath, nodePos, SITE_NODE, SPAWN_NODE, HOLD_NODES } from './nav.js';
@@ -16,6 +17,10 @@ import { smokeBlocks, throwGrenade } from './grenade.js';
 const _eye = new THREE.Vector3();
 const _chest = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
+// Scratch vectors for bot hitscan (v6-full): origin and aim point, reused
+// every shot instead of allocating (fix 5).
+const _origin = new THREE.Vector3();
+const _aim = new THREE.Vector3();
 
 function makeMesh(team) {
   const g = new THREE.Group();
@@ -49,7 +54,11 @@ export function createBots(G) {
         mesh: group, state: 'route', path: [], pathI: 0,
         destNode: SPAWN_NODE[team], pathDest: null, holdT: 0, thinkT: G.rng() * 0.15,
         target: null, reactT: 0, burstLeft: 0, burstPause: 0, cool: 0,
-        lastSeen: null, lastSeenT: 0, heardPos: null, heardT: 0,
+        // Preallocated perception memory (v6-full, fix 5): lastSeen and
+        // heardPos are scratch vectors filled by copy(), never cloned.
+        // lastSeenSet / heard say whether the vector holds a real position.
+        lastSeen: new THREE.Vector3(), lastSeenSet: false,
+        lastSeenT: 0, heardPos: new THREE.Vector3(), heard: false, heardT: 0,
         plantT: 0, defuseT: 0, radioCd: 0, strafe: 1, strafeT: 0,
         site: team === 'atk' ? (i % 2 === 0 ? 'A' : 'B') : null,
         eyeH: 1.55,
@@ -86,6 +95,7 @@ export function resetBotsForRound(G) {
     b.state = 'route';
     b.target = null;
     b.plantT = 0; b.defuseT = 0; b.burstLeft = 0; b.cool = 0;
+    b.heard = false; b.lastSeenSet = false;
     b.destNode = b.team === 'atk' ? SITE_NODE[b.site] : HOLD_NODES[(b.id * 2) % HOLD_NODES.length];
     b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode);
     b.pathI = 0;
@@ -144,7 +154,19 @@ function botShoot(G, b, dt) {
     return;
   }
   st.mag--;
-  // Hit roll: close and still is deadly, far and moving is not.
+  // Shared hitscan (v6-full): the bot fires the same raycast the player
+  // uses, aimed at the target's upper chest with a human error, so walls
+  // stop the bullet and headshots are real geometry instead of a dice
+  // roll. The error is sized so the geometric hit probability tracks the
+  // old roll's curve: p(d) = 0.55 - 0.4*d/seeDist with the old
+  // speed/crouch/move modifiers, because for a uniform error e over a
+  // torso of half-area 0.1375 m^2, P(hit) = 0.1375/e^2. Same lethality,
+  // real bullets. Weapon spread still applies via currentSpread.
+  // Calibration (measured, ttk-probe 8 m rifle vs HP 100): the plain
+  // 0.1375 constant ran at ~55% of the roll curve (TTK 8.5 s vs v5's
+  // 4.7 s), because hitscanShot adds the weapon spread on top of the
+  // aim error. Halving the constant (err x0.7) brings the effective hit
+  // rate back to the v5 roll.
   const d = b.pos.distanceTo(t.pos);
   let p = 0.55 - (d / CFG.bot.seeDist) * 0.4;
   const tSpeed = Math.hypot(t.vel.x, t.vel.z);
@@ -152,13 +174,22 @@ function botShoot(G, b, dt) {
   if (t.crouching) p -= 0.05;
   if (Math.hypot(b.vel.x, b.vel.z) > 1) p -= 0.15;
   p = Math.max(0.05, Math.min(0.8, p));
+  const err = Math.max(0.25, Math.min(1.6, Math.sqrt(0.0675 / p)));
+  _origin.set(b.pos.x, b.pos.y + b.eyeH, b.pos.z);
+  // Aim at the upper chest: spread can still clip the head box above it.
+  _aim.set(
+    t.pos.x + (G.rng() - 0.5) * 2 * err,
+    t.pos.y + 1.05 + (G.rng() - 0.5) * 2 * err,
+    t.pos.z + (G.rng() - 0.5) * 2 * err,
+  );
+  _tmp.subVectors(_aim, _origin).normalize();
+  const hit = hitscanShot(G, b, _origin, _tmp, currentSpread(G, b));
   // The shot is heard: a ping on the enemy team's minimap.
   G.pings.push({ x: b.pos.x, z: b.pos.z, t: G.time });
   if (G.noise) G.noise(b.pos, CFG.bot.hearR);
   playShot(G, b.cur, b.pos);
-  if (G.rng() < p) {
-    const head = G.rng() < 0.12;
-    damageAgent(G, t, w.dmg * (head ? w.headMul : 1), head ? 'head' : 'torso', b);
+  if (hit) {
+    damageAgent(G, hit.agent, w.dmg * (hit.part === 'head' ? w.headMul : 1), hit.part, b);
   }
 }
 
@@ -216,7 +247,9 @@ export function stepBots(G, dt) {
           b.reactT = CFG.bot.reactionMin + G.rng() * (CFG.bot.reactionMax - CFG.bot.reactionMin);
         }
         b.target = best;
-        b.lastSeen = best.pos.clone();
+        // Preallocated copy (v6-full, fix 5): no clone() per sighting.
+        b.lastSeen.copy(best.pos);
+        b.lastSeenSet = true;
         b.lastSeenT = 0;
         b.state = 'engage';
       } else if (b.target) {
@@ -315,9 +348,9 @@ export function stepBots(G, dt) {
         setDest(G, b, HOLD_NODES[(b.id + G.round.num) % HOLD_NODES.length]);
       }
     } else if (b.state === 'react') {
-      const goal = b.heardPos ?? b.lastSeen;
+      const goal = b.heard ? b.heardPos : (b.lastSeenSet ? b.lastSeen : null);
       if (goal) {
-        if (moveToward(G, b, goal.x, goal.z, dt, CFG.bot.walk)) { b.state = 'hold'; b.holdT = 2; b.heardPos = null; }
+        if (moveToward(G, b, goal.x, goal.z, dt, CFG.bot.walk)) { b.state = 'hold'; b.holdT = 2; b.heard = false; }
       } else b.state = 'hold';
     } else if (b.state === 'plant') {
       b.vel.set(0, 0, 0);

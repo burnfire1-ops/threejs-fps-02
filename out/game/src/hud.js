@@ -13,7 +13,7 @@ export function initHud() {
     'dmg', 'dmgdir', 'hp-num', 'hp-bar', 'armor-num', 'armor-bar', 'ammo-mag', 'ammo-res',
     'weapon-name', 'timer', 'score-line', 'round-label', 'money', 'killfeed', 'radio',
     'banner', 'buymenu', 'buy-grid', 'buy-money', 'bomb-status', 'progress', 'progress-fill',
-    'progress-label', 'scoreboard', 'scoreboard-body', 'toast', 'minimap', 'buy-hint']) {
+    'progress-label', 'scoreboard', 'scoreboard-body', 'toast', 'minimap', 'buy-hint', 'spectate']) {
     els[id] = $(id);
   }
   mmCtx = els.minimap?.getContext('2d') ?? null;
@@ -162,6 +162,13 @@ export function stepHud(G, dt) {
   }
   // Toast (buy results).
   if (els.toast) els.toast.textContent = G.toastT > 0 ? G.toast : '';
+  // Spectator label (v6-full): who the dead player is watching.
+  if (els.spectate) {
+    const t = G.spectate;
+    const show = !p.alive && t && r.state !== 'over';
+    els.spectate.style.display = show ? 'block' : 'none';
+    if (show) els.spectate.textContent = `SPECTATING ${t.name}`;
+  }
   // Buy menu.
   if (els.buymenu) {
     const open = G.buyOpen && r.state === 'freeze';

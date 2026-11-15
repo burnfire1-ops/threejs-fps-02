@@ -30,6 +30,11 @@ export function startRound(G) {
   p.alive = true;
   p.yaw = p.team === 'atk' ? 0 : Math.PI;
   p.pitch = 0;
+  // v6-full: clear the recoverable recoil offset and the spectator target.
+  p.recoilPitch = 0;
+  p.recoilYaw = 0;
+  p.lastShotT = -99;
+  G.spectate = null;
   // Keep weapons and money between rounds; refresh the starter pistol.
   if (!p.weapons.pistol) {
     const w = CFG.weapons.pistol;

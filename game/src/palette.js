@@ -1,19 +1,22 @@
 // palette.js — the game's six colours, plus one accent per team.
 // The map stays inside this palette so the scene reads at a glance.
 export const PAL = {
-  canvas: 0x14161a,
+  canvas: 0x1c2632,
   surface: 0x1e2228,
   hairline: 0x2c323a,
   ink: 0xe9e6df,
   muted: 0x98a0a8,
   accent: 0xf0a830,
-  // Map dressing, still inside the palette's family.
-  floor: 0x2a2e34,
-  wall: 0x363c45,
-  wallTop: 0x424a55,
-  pipe: 0x8a6f3c,
-  turbine: 0xb98a2e,
-  coolant: 0x2e6f6a,
+  // Map dressing, still inside the palette's family. v6-full brightened
+  // the map out of the flat grey-box look: lighter floor and walls, a
+  // dusk-blue exterior instead of near-black, warmer accents.
+  floor: 0x363b43,
+  wall: 0x49525e,
+  wallAlt: 0x3d4550,
+  wallTop: 0x57637a,
+  pipe: 0xa8873f,
+  turbine: 0xd09a33,
+  coolant: 0x35918a,
   steam: 0xcfd6da,
   siteA: 0xf0a830,
   siteB: 0x3ec6b8,

@@ -11,6 +11,11 @@ const _dir = new THREE.Vector3();
 const _shotDir = new THREE.Vector3();
 const _origin = new THREE.Vector3();
 const _ray = new THREE.Raycaster();
+// Preallocated target list for hitscan (v6-full, fix 5): the old code built
+// a fresh [...solids, ...shootables] array on every pellet. This scratch
+// array is filled once per shot and reused; intersectObjects never keeps
+// the array, so reuse is safe.
+const _targets = [];
 
 // Spread in radians: still base, grows with speed and with bloom from firing,
 // halves while aiming. Standing still to aim pays off; spraying on the run does not.
@@ -62,8 +67,10 @@ export function hitscanShot(G, shooter, origin, dir, spread) {
   _shotDir.normalize();
   _ray.set(origin, _shotDir);
   _ray.far = 120;
-  const targets = [...G.world.solids, ...G.shootables];
-  const hits = _ray.intersectObjects(targets, false);
+  _targets.length = 0;
+  for (let i = 0; i < G.world.solids.length; i++) _targets.push(G.world.solids[i]);
+  for (let i = 0; i < G.shootables.length; i++) _targets.push(G.shootables[i]);
+  const hits = _ray.intersectObjects(_targets, false);
   for (const h of hits) {
     const ud = h.object.userData;
     if (ud.agent !== undefined) {
@@ -93,8 +100,12 @@ export function tryFire(G, dt) {
   st.cooldown = w.gap;
   st.mag--;
   p.bloom = Math.min(0.03, (p.bloom ?? 0) + w.kick * 0.5);
-  p.pitch += w.kick * (0.85 + G.rng() * 0.3);
-  p.yaw += (G.rng() - 0.5) * w.kick * 0.4;
+  // Recoil per shot is unchanged (same kick magnitude as v5); it now
+  // lands in the recoverable recoil offset instead of permanently
+  // displacing the aim.
+  p.recoilPitch += w.kick * (0.85 + G.rng() * 0.3);
+  p.recoilYaw += (G.rng() - 0.5) * w.kick * 0.4;
+  p.lastShotT = G.time;
   G.viewModel.kick = 1;
   G.viewModel.flash.material.opacity = 0.9;
   G.viewModel.flashLight.intensity = 6;

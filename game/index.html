@@ -50,6 +50,7 @@
   #progress-fill { background:var(--accent); }
   #minimap { position:absolute; right:16px; top:12px; border:1px solid #2c323a; border-radius:4px; background:#101216; }
   #toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); font-size:13px; color:var(--accent); text-shadow:0 1px 3px #000; }
+  #spectate { position:absolute; left:50%; top:88px; transform:translateX(-50%); font-size:13px; letter-spacing:2px; color:var(--teal); text-shadow:0 1px 3px #000; display:none; }
   #buy-hint { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); font-size:13px; color:var(--muted); display:none; }
   #buymenu { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:420px; display:none; pointer-events:none; }
   #buymenu h2 { font-size:15px; letter-spacing:2px; margin-bottom:2px; }
@@ -101,6 +102,7 @@
   <div id="banner"></div>
   <div id="progress"><div id="progress-label">PLANTING…</div><div class="bar"><i id="progress-fill" style="width:0%"></i></div></div>
   <div id="toast"></div>
+  <div id="spectate"></div>
   <div id="buy-hint">Press B to open the buy menu</div>
   <div id="buymenu" class="panel"><h2>BUY MENU</h2><div id="buy-money">$800</div><div id="buy-grid"></div></div>
   <div id="scoreboard" class="panel"><h2>SCOREBOARD — STEAMWORKS</h2><div id="scoreboard-body"></div></div>
