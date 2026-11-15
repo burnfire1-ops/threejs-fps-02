@@ -6,11 +6,11 @@ import * as THREE from 'three';
 // [x, z] per node.
 const NODES = [
   [0, 17], [-16, 12], [0, 12], [16, 12], // 0 spawn atk, 1 A entry, 2 mid entry, 3 B entry
-  [-16, 4], [0, 4], [16, 4], // 4 A-long, 5 mid, 6 B-short
-  [-12, -2], [0, -2], [12, -2], // 7 A conn, 8 mid conn, 9 B conn
-  [-16, -8], [0, -8], [16, -8], // 10 A north, 11 mid north, 12 B north
+  [-14, 6], [3, 4], [14, 6], // 4 A-long, 5 mid, 6 B-short
+  [-14, 0], [2, 0], [14, 0], // 7 A conn, 8 mid conn, 9 B conn
+  [-14, -8], [0, -8], [14, -8], // 10 A north, 11 mid north, 12 B north
   [-13, -12], [13, -12], // 13 site A, 14 site B
-  [0, -17], [-8, -14], [8, -14], // 15 spawn def, 16 yard W, 17 yard E
+  [0, -15], [-8, -14], [8, -14], // 15 spawn def, 16 yard W, 17 yard E
 ];
 const EDGES = [
   [0, 1], [0, 2], [0, 3],

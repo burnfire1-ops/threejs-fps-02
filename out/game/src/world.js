@@ -131,7 +131,7 @@ export function createWorld(scene) {
   scene.fog = new THREE.Fog(PAL.canvas, 30, 75);
   const spawns = {
     atk: [[-4, 17], [-2, 18], [0, 16.5], [2, 18], [4, 17]].map(([x, z]) => new THREE.Vector3(x, 0, z)),
-    def: [[-4, -17], [-2, -18], [0, -16.5], [2, -18], [4, -17]].map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    def: [[-4, -17], [-2, -18], [0, -15], [2, -18], [4, -17]].map(([x, z]) => new THREE.Vector3(x, 0, z)),
   };
   return { group, colliders, solids, spawns, sites, steam, drum };
 }

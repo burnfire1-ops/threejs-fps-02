@@ -47,7 +47,7 @@ export function createBots(G) {
         money: 0, kit: false, grenades: { he: 0, smoke: 0 },
         weapons: {}, cur: 'pistol', bloom: 0,
         mesh: group, state: 'route', path: [], pathI: 0,
-        destNode: SPAWN_NODE[team], pathDest: null, holdT: 0, thinkT: Math.random() * 0.15,
+        destNode: SPAWN_NODE[team], pathDest: null, holdT: 0, thinkT: G.rng() * 0.15,
         target: null, reactT: 0, burstLeft: 0, burstPause: 0, cool: 0,
         lastSeen: null, lastSeenT: 0, heardPos: null, heardT: 0,
         plantT: 0, defuseT: 0, radioCd: 0, strafe: 1, strafeT: 0,
@@ -278,7 +278,7 @@ export function stepBots(G, dt) {
       b.reactT -= dt;
       // Strafe slowly while shooting.
       b.strafeT -= dt;
-      if (b.strafeT <= 0) { b.strafe = Math.random() < 0.5 ? -1 : 1; b.strafeT = 0.7 + G.rng() * 0.8; }
+      if (b.strafeT <= 0) { b.strafe = G.rng() < 0.5 ? -1 : 1; b.strafeT = 0.7 + G.rng() * 0.8; }
       b.vel.set(Math.cos(b.yaw) * b.strafe * 0.9, 0, -Math.sin(b.yaw) * b.strafe * 0.9);
       if (b.reactT <= 0 && G.round.state === 'live') botShoot(G, b, dt);
     } else if (b.state === 'route') {
