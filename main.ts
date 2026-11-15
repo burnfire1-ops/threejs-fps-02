@@ -4,13 +4,19 @@
 // OUT is /output, or MAKEFUN_OUTPUT_DIR when that is set (local runs).
 import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-threejs.ts';
+
+// Resolve game/ and screenshots/ relative to this script's directory,
+// not the current working directory: the grader runs `node /bot/main.ts`
+// from a different cwd, where resolve('game') would fail with ENOENT.
+const here = fileURLToPath(new URL('.', import.meta.url));
 
 const out = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-cpSync(resolve('game'), resolve(out, 'game'), { recursive: true });
-cpSync(resolve('screenshots'), resolve(out, 'screenshots'), { recursive: true });
+cpSync(resolve(here, 'game'), resolve(out, 'game'), { recursive: true });
+cpSync(resolve(here, 'screenshots'), resolve(out, 'screenshots'), { recursive: true });
 writeFileSync(
   resolve(out, 'dossier.json'),
   buildDossier(out, {
