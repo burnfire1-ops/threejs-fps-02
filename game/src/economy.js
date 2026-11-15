@@ -31,7 +31,7 @@ export function buyItem(G, key) {
     }
     if (p.money < w.price) return 'Not enough money';
     p.money -= w.price;
-    p.weapons[key] = { mag: w.mag, reserve: w.reserve, reloading: 0 };
+    p.weapons[key] = { mag: w.mag, reserve: w.reserve, reloading: 0, cooldown: 0 };
     p.cur = key;
     return `${w.name} bought -$${w.price}`;
   }

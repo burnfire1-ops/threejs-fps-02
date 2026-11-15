@@ -52,7 +52,7 @@ export function createPlayerHitbox(G, p) {
 // Give the player a weapon's ammo state (called on spawn / on buy).
 export function giveWeapon(p, key) {
   const w = CFG.weapons[key];
-  p.weapons[key] = { mag: w.mag, reserve: w.reserve, reloading: 0 };
+  p.weapons[key] = { mag: w.mag, reserve: w.reserve, reloading: 0, cooldown: 0 };
 }
 
 export function stepPlayer(G, dt) {

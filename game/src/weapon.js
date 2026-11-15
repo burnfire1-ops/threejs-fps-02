@@ -29,30 +29,108 @@ export function currentSpread(G, a) {
   return s;
 }
 
+// Per-weapon view models (v7-visual, CS:GO-style): one group per gun,
+// each built from boxes/cylinders with a readable silhouette — pistol
+// slide, SMG suppressor, shotgun pump, rifle magazine, LMG drum, sniper
+// scope — plus two gloved hands gripping it. Only the current gun's
+// group is visible; switching only toggles .visible, so the hot loop
+// still allocates nothing. The flash plane/light stay single and move
+// to the current muzzle. All stats live in CFG.weapons (untouched).
+function vmBox(mat, w, h, d, x, y, z, rx = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  if (rx) m.rotation.x = rx;
+  return m;
+}
+function vmTube(mat, r, len, x, y, z, rz = 0) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), mat);
+  if (rz) { m.rotation.z = rz; } else { m.rotation.x = Math.PI / 2; }
+  m.position.set(x, y, z);
+  return m;
+}
+
 export function createViewModel(camera) {
-  const g = new THREE.Group();
   const dark = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6, metalness: 0.5 });
   const mid = new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.5, metalness: 0.6 });
-  const recv = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.13, 0.42), dark);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 8), mid);
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.set(0, 0.02, -0.32);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.1), dark);
-  grip.position.set(0, -0.13, 0.1);
-  grip.rotation.x = 0.3;
-  g.add(recv, barrel, grip);
-  g.position.set(0.24, -0.22, -0.45);
-  camera.add(g);
+  const glove = new THREE.MeshStandardMaterial({ color: 0x2a2118, roughness: 0.9 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6b4f2e, roughness: 0.85 });
+  const groups = {};
+  const muzzle = {};
+  const base = (g) => { g.position.set(0.24, -0.22, -0.45); camera.add(g); return g; };
+  // Two gloved hands: right on the grip, left on the forend.
+  const hands = (g, gz, fz) => {
+    g.add(vmBox(glove, 0.07, 0.09, 0.12, 0.03, -0.06, gz));
+    g.add(vmBox(glove, 0.07, 0.09, 0.12, -0.05, -0.03, fz));
+  };
+  let g = new THREE.Group(); // P9 pistol: compact slide + grip.
+  g.add(vmBox(dark, 0.07, 0.09, 0.26, 0, 0.03, -0.12));
+  g.add(vmBox(dark, 0.06, 0.15, 0.09, 0, -0.1, 0.06, 0.25));
+  hands(g, 0.06, -0.2);
+  groups.pistol = base(g); muzzle.pistol = -0.32;
+  g = new THREE.Group(); // VK-9 SMG: receiver + long mag + suppressor.
+  g.add(vmBox(dark, 0.08, 0.11, 0.34, 0, 0.02, -0.1));
+  g.add(vmBox(dark, 0.05, 0.18, 0.07, 0, -0.1, -0.05));
+  g.add(vmTube(mid, 0.025, 0.18, 0, 0.03, -0.36));
+  g.add(vmBox(dark, 0.06, 0.09, 0.14, 0, 0.01, 0.14));
+  hands(g, 0.1, -0.22);
+  groups.smg = base(g); muzzle.smg = -0.48;
+  g = new THREE.Group(); // M590 shotgun: thick barrel + pump + tube mag.
+  g.add(vmBox(dark, 0.09, 0.12, 0.4, 0, 0.02, -0.08));
+  g.add(vmTube(mid, 0.028, 0.34, 0, 0.04, -0.36));
+  g.add(vmBox(wood, 0.08, 0.09, 0.16, 0, -0.03, -0.3));
+  g.add(vmTube(mid, 0.02, 0.3, 0, -0.03, -0.34));
+  g.add(vmBox(wood, 0.07, 0.11, 0.16, 0, -0.01, 0.16));
+  hands(g, 0.12, -0.3);
+  groups.shotgun = base(g); muzzle.shotgun = -0.56;
+  g = new THREE.Group(); // AR-77 rifle: receiver + angled mag + sight.
+  g.add(vmBox(dark, 0.09, 0.12, 0.44, 0, 0.02, -0.1));
+  g.add(vmBox(mid, 0.06, 0.2, 0.09, 0, -0.11, -0.06, 0.15));
+  g.add(vmTube(mid, 0.02, 0.3, 0, 0.03, -0.42));
+  g.add(vmBox(dark, 0.02, 0.06, 0.02, 0, 0.1, -0.5));
+  g.add(vmBox(dark, 0.07, 0.1, 0.16, 0, 0.01, 0.16));
+  hands(g, 0.1, -0.28);
+  groups.rifle = base(g); muzzle.rifle = -0.58;
+  g = new THREE.Group(); // MG-60 LMG: big receiver + drum + bipod hint.
+  g.add(vmBox(dark, 0.11, 0.14, 0.5, 0, 0.02, -0.1));
+  g.add(vmTube(mid, 0.09, 0.08, 0, -0.1, -0.05, Math.PI / 2));
+  g.add(vmTube(mid, 0.025, 0.4, 0, 0.04, -0.46));
+  g.add(vmTube(dark, 0.012, 0.2, -0.05, -0.08, -0.42));
+  g.add(vmTube(dark, 0.012, 0.2, 0.05, -0.08, -0.42));
+  hands(g, 0.12, -0.3);
+  groups.lmg = base(g); muzzle.lmg = -0.68;
+  g = new THREE.Group(); // LR-50 sniper: long barrel + big scope + bolt.
+  g.add(vmBox(dark, 0.08, 0.11, 0.5, 0, 0.02, -0.08));
+  g.add(vmTube(mid, 0.035, 0.24, 0, 0.11, -0.1));
+  g.add(vmBox(dark, 0.02, 0.05, 0.02, 0, 0.07, -0.02));
+  g.add(vmBox(dark, 0.02, 0.05, 0.02, 0, 0.07, -0.18));
+  g.add(vmTube(mid, 0.016, 0.42, 0, 0.03, -0.5));
+  g.add(vmBox(mid, 0.06, 0.02, 0.02, 0.06, 0.05, -0.02));
+  g.add(vmBox(dark, 0.07, 0.1, 0.18, 0, 0, 0.18));
+  hands(g, 0.12, -0.32);
+  groups.sniper = base(g); muzzle.sniper = -0.74;
+  for (const k of Object.keys(groups)) groups[k].visible = k === 'pistol';
   const flash = new THREE.Mesh(
     new THREE.PlaneGeometry(0.22, 0.22),
     new THREE.MeshBasicMaterial({ color: 0xffc861, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
   );
-  flash.position.set(0.24, -0.19, -0.72);
+  flash.position.set(0.24, -0.19, -0.85);
   camera.add(flash);
   const flashLight = new THREE.PointLight(0xffc861, 0, 6);
-  flashLight.position.set(0.24, -0.19, -0.72);
+  flashLight.position.set(0.24, -0.19, -0.85);
   camera.add(flashLight);
-  return { group: g, flash, flashLight, kick: 0, bobT: 0 };
+  return { groups, group: groups.pistol, muzzle, flash, flashLight, kick: 0, bobT: 0 };
+}
+
+// Show one weapon's view model and move the flash to its muzzle.
+// Called from switchWeapon; no allocation, only .visible toggles.
+export function setViewWeapon(G, key) {
+  const vm = G.viewModel;
+  if (!vm || !vm.groups[key]) return;
+  for (const k of Object.keys(vm.groups)) vm.groups[k].visible = k === key;
+  vm.group = vm.groups[key];
+  vm.group.position.set(0.24, -0.22, -0.45);
+  vm.flash.position.set(0.24, -0.19, -0.45 + vm.muzzle[key] - 0.08);
+  vm.flashLight.position.copy(vm.flash.position);
 }
 
 // One hitscan ray. Returns the agent hit (or null). Walls stop the bullet.
@@ -175,5 +253,8 @@ export function switchWeapon(G, a, key) {
   a.cur = key;
   const st = a.weapons[key];
   st.reloading = 0;
-  if (a.isPlayer) G.hudWeaponFlash = 0.5;
+  if (a.isPlayer) {
+    G.hudWeaponFlash = 0.5;
+    setViewWeapon(G, key);
+  }
 }

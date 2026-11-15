@@ -40,11 +40,14 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // Filmic tone mapping (v6-full, fix 3): lifts the flat grey-box look
 // without touching any geometry.
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+// v7-visual: a touch brighter for the daylight sky.
+renderer.toneMappingExposure = 1.25;
 document.getElementById('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(PAL.canvas);
+// Daylight sky (v7-visual): bright blue like a sunlit CS:GO yard.
+// The old dusk-blue canvas stays for the HUD/menu only.
+scene.background = new THREE.Color(PAL.sky);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
 scene.add(camera);
 

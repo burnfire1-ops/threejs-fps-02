@@ -104,6 +104,81 @@ function wallTexture(base, idx) {
     }
   });
 }
+// Crate paint (v7-visual, CS:GO-style): 'wood' is horizontal planks
+// with a frame and nail dots; 'metal' is riveted steel panels with a
+// stencilled number. Same canvas-texture pipeline as the containers.
+function crateTexture(kind, idx) {
+  return canvasTex(256, 256, (x, w, h) => {
+    const rnd = srand(0xc4a7e + idx * 31337);
+    if (kind === 'wood') {
+      x.fillStyle = css(PAL.wood);
+      x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 4; i++) {
+        const y = (i * h) / 4;
+        x.fillStyle = i % 2 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.07)';
+        x.fillRect(0, y, w, h / 4);
+        x.fillStyle = 'rgba(0,0,0,0.35)';
+        x.fillRect(0, y, w, 3);
+      }
+      x.fillStyle = css(PAL.woodDark);
+      x.fillRect(0, 0, 14, h);
+      x.fillRect(w - 14, 0, 14, h);
+      x.fillRect(0, 0, w, 14);
+      x.fillRect(0, h - 14, w, 14);
+      x.fillStyle = 'rgba(0,0,0,0.4)';
+      for (const [nx, ny] of [[24, 24], [w - 24, 24], [24, h - 24], [w - 24, h - 24]]) {
+        x.beginPath(); x.arc(nx, ny, 4, 0, Math.PI * 2); x.fill();
+      }
+      for (let i = 0; i < 250; i++) {
+        x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
+        x.fillRect(rnd() * w, rnd() * h, 2, 2);
+      }
+    } else {
+      x.fillStyle = css(PAL.metal);
+      x.fillRect(0, 0, w, h);
+      x.fillStyle = 'rgba(0,0,0,0.18)';
+      for (let i = 1; i < 4; i++) x.fillRect((i * w) / 4 - 2, 0, 4, h);
+      x.fillStyle = css(PAL.metalDark);
+      x.fillRect(0, 0, w, 10);
+      x.fillRect(0, h - 10, w, 10);
+      x.fillStyle = 'rgba(255,255,255,0.25)';
+      for (const [rx, ry] of [[14, 14], [w - 14, 14], [14, h - 14], [w - 14, h - 14]]) {
+        x.beginPath(); x.arc(rx, ry, 4, 0, Math.PI * 2); x.fill();
+      }
+      x.save();
+      x.translate(w / 2, h / 2);
+      x.font = 'bold 84px sans-serif';
+      x.textAlign = 'center';
+      x.textBaseline = 'middle';
+      x.fillStyle = 'rgba(255,255,255,0.3)';
+      x.fillText(String(20 + idx * 3), 0, 0);
+      x.restore();
+      for (let i = 0; i < 250; i++) {
+        x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)';
+        x.fillRect(rnd() * w, rnd() * h, 2, 2);
+      }
+    }
+  });
+}
+// Bombsite sign (v7-visual): a dark board with hazard stripes and a big
+// site letter + "BOMBSITE" label, hung on the north wall above the site.
+function signTexture(letter, color) {
+  return canvasTex(512, 256, (x, w, h) => {
+    x.fillStyle = css(PAL.trimDark);
+    x.fillRect(0, 0, w, h);
+    x.fillStyle = css(PAL.hazard);
+    x.fillRect(0, 0, w, 16);
+    x.fillRect(0, h - 16, w, 16);
+    x.font = 'bold 150px sans-serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillStyle = css(color);
+    x.fillText(letter, w / 2, h / 2 - 18);
+    x.font = 'bold 44px sans-serif';
+    x.fillStyle = 'rgba(233,230,223,0.9)';
+    x.fillText('BOMBSITE', w / 2, h - 62);
+  });
+}
 // Floor paint (1024px, one texture for the whole 40x40 floor): concrete
 // with speckle and oil stains, amber/teal zone washes at the sites,
 // dashed lane lines, hazard frames around both sites, big A/B stencils,
@@ -179,12 +254,14 @@ function floorTexture() {
     };
     hazardFrame(-13, -12, 3.6);
     hazardFrame(13, -12, 3.6);
-    x.font = 'bold 150px sans-serif';
+    // Site letters (v7-visual): bigger and bolder than v6, so each site
+    // reads at a glance like a CS:GO bombsite marking.
+    x.font = 'bold 200px sans-serif';
     x.textAlign = 'center';
     x.textBaseline = 'middle';
-    x.fillStyle = 'rgba(240,168,48,0.5)';
+    x.fillStyle = 'rgba(240,168,48,0.68)';
     x.fillText('A', X(-13), Z(-12));
-    x.fillStyle = 'rgba(62,198,184,0.5)';
+    x.fillStyle = 'rgba(62,198,184,0.68)';
     x.fillText('B', X(13), Z(-12));
     x.fillStyle = 'rgba(233,230,223,0.4)';
     for (const lx of [-16, 0, 16]) {
@@ -305,9 +382,23 @@ export function createWorld(scene) {
   // Cover props wear container paint: each prop takes the next colour of
   // the container palette, so no two neighbours share a colour. The
   // turbine block and tower base keep their amber/teal accents.
+  // v7-visual: the small 1.4 m crates wear CS:GO-style wood/metal crate
+  // paint instead (alternating), like Dust2 crates; the big blocks keep
+  // container paint. Same boxes, same colliders — only the texture swaps.
+  const crateMats = {};
+  const crateMat = (kind, idx) => (crateMats[`${kind}${idx}`] ??= new THREE.MeshStandardMaterial({
+    map: crateTexture(kind, idx), roughness: 0.9, metalness: kind === 'metal' ? 0.25 : 0.05,
+  }));
+  let crateCount = 0;
   COVER.forEach(([cx, cz, w, d, h, col], i) => {
     const color = col ?? PAL.container[i % PAL.container.length];
-    addBox(cx, cz, w, d, h, color, 0, containerMat(color, i));
+    if (!col && w <= 1.6 && d <= 1.6 && h <= 1.4) {
+      const kind = crateCount % 2 === 0 ? 'wood' : 'metal';
+      addBox(cx, cz, w, d, h, color, 0, crateMat(kind, crateCount));
+      crateCount++;
+    } else {
+      addBox(cx, cz, w, d, h, color, 0, containerMat(color, i));
+    }
   });
   // Turbine (site A): warm block + spinning drum visual; Cooling tower (site B).
   // Both glow faintly from within (v6-full, fix 3): the sites read as
@@ -343,6 +434,35 @@ export function createWorld(scene) {
     pipeMid.rotation.x = Math.PI / 2;
     pipeMid.position.set(x, 4.0, 2);
     group.add(pipeMid);
+  }
+  // Door headers (v7-visual, CS:GO-style): dark steel lintels across
+  // the top of every lane-entry gap — the spawn divider (3 gaps), the
+  // mid exit wall (1 gap), and the mid-divider connectors (2 gaps).
+  // They sit at y 3.4..4.6, above every agent's head, and are NEVER
+  // added to solids/colliders: they cannot block movement or bullets.
+  // [cx, cz, w, d] per lintel.
+  const lintelMat = mat(PAL.trimDark);
+  let lintelCount = 0;
+  for (const [lx, lz, lw, ld] of [
+    [-16, 12, 4, 1.2], [0, 12, 6, 1.2], [16, 12, 4, 1.2],
+    [0, -8, 4, 1.2], [-8, 0, 1.2, 4], [8, 0, 1.2, 4],
+  ]) {
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(lw, 1.2, ld), lintelMat);
+    lintel.position.set(lx, 4.0, lz);
+    lintel.castShadow = true;
+    group.add(lintel);
+    lintelCount++;
+  }
+  // Bombsite signs (v7-visual): big "A / BOMBSITE" and "B / BOMBSITE"
+  // boards on the north wall above each site, like CS:GO site signage.
+  // Flat planes on the wall face, visual only.
+  let signCount = 0;
+  for (const [letter, sx, color] of [['A', -13, PAL.siteA], ['B', 13, PAL.siteB]]) {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.5),
+      new THREE.MeshStandardMaterial({ map: signTexture(letter, color), roughness: 0.8 }));
+    sign.position.set(sx, 3.3, -19.44);
+    group.add(sign);
+    signCount++;
   }
   // Barrels on crate tops (v6-visual): cylinders sitting exactly on
   // existing cover footprints — no new walkable-space intrusion. They
@@ -411,23 +531,23 @@ export function createWorld(scene) {
     group.add(puff);
     steam.push(puff);
   }
-  // Lighting: hemisphere + warm key with shadows + two site point lights.
-  // v6-full (fix 3): brighter overall, plus a warm mid-lane lamp and a
-  // cool attacker-yard lamp so the dark middle and south stop reading
-  // as black voids.
-  scene.add(new THREE.HemisphereLight(0x8fa3b8, 0x1a1c20, 1.6));
-  const sun = new THREE.DirectionalLight(0xffd9a0, 2.6);
-  sun.position.set(18, 26, 10);
+  // Lighting (v7-visual, daylight): bright blue-sky hemisphere over a
+  // warm ground bounce, and a strong warm-white sun high overhead, so
+  // the map reads like a sunlit CS:GO yard. Site lamps stay as accent
+  // glows, dimmed a little now that the sun does the heavy lifting.
+  scene.add(new THREE.HemisphereLight(0xbfd9f2, 0x8a7a5e, 2.0));
+  const sun = new THREE.DirectionalLight(PAL.sun, 3.0);
+  sun.position.set(18, 30, 12);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -24; sun.shadow.camera.right = 24;
   sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
   sun.shadow.camera.far = 70;
   group.add(sun);
-  const lampA = new THREE.PointLight(PAL.siteA, 26, 16);
+  const lampA = new THREE.PointLight(PAL.siteA, 18, 16);
   lampA.position.set(-13, 3.4, -12);
   group.add(lampA);
-  const lampB = new THREE.PointLight(PAL.siteB, 26, 16);
+  const lampB = new THREE.PointLight(PAL.siteB, 18, 16);
   lampB.position.set(13, 3.4, -12);
   group.add(lampB);
   const lampMid = new THREE.PointLight(0xffd9a0, 12, 14);
@@ -437,7 +557,9 @@ export function createWorld(scene) {
   lampYard.position.set(0, 3.4, 16);
   group.add(lampYard);
   scene.add(group);
-  scene.fog = new THREE.Fog(PAL.canvas, 30, 75);
+  // Daylight haze (v7-visual): pale horizon fog, further out than the
+  // old dusk fog, so the bright sky and the map blend at the edges.
+  scene.fog = new THREE.Fog(PAL.skyHorizon, 35, 95);
   const spawns = {
     atk: [[-4, 17], [-2, 18], [0, 16.5], [2, 18], [4, 17]].map(([x, z]) => new THREE.Vector3(x, 0, z)),
     def: [[-4, -17], [-2, -18], [0, -15], [2, -18], [4, -17]].map(([x, z]) => new THREE.Vector3(x, 0, z)),
@@ -446,7 +568,8 @@ export function createWorld(scene) {
     group, colliders, solids, spawns, sites, steam, drum,
     // Visual-only decor counts (v6-visual), for the playtest to assert
     // the new look actually rendered. Nothing here feeds the sim.
-    decor: { barrels: barrelCount, pipesNew: 3, floorTextured: true, containerColors: PAL.container.length },
+    // v7-visual adds the CS:GO dressing counts (crates, lintels, signs).
+    decor: { barrels: barrelCount, pipesNew: 3, floorTextured: true, containerColors: PAL.container.length, crates: crateCount, lintels: lintelCount, siteSigns: signCount },
   };
 }
 

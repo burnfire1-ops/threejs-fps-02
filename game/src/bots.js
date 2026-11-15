@@ -6,6 +6,7 @@
 // aimbot: every shot is a probability roll, worse on the move and at range.
 import * as THREE from 'three';
 import { CFG } from './config.js';
+import { PAL } from './palette.js';
 import { giveWeapon } from './player.js';
 import { damageAgent } from './combat.js';
 import { hitscanShot, currentSpread } from './weapon.js';
@@ -23,32 +24,65 @@ const _origin = new THREE.Vector3();
 const _aim = new THREE.Vector3();
 
 function makeMesh(team) {
-  // Humanoid low-poly (v6-visual): capsule torso, sphere head with a
-  // visor slit, shoulder pads, capsule arms angled forward to hold the
-  // gun, capsule legs. The torso keeps the old body box's bounding box
-  // (0.55 wide, y 0.44..1.46) and the head keeps the old 0.32 cube's
-  // diameter, so the shootable hitbox is the same shape in the same
-  // place — only the silhouette changes. Arms/legs/visor/pads are
-  // visual only and are never added to G.shootables.
+  // CS:GO-style operator (v7-visual): the v6 capsule humanoid, dressed
+  // as a team-distinct soldier — CTs in dark blue, Ts in tan/khaki —
+  // with a helmet, tactical vest, backpack, belt, and knee pads. The
+  // torso keeps the old body box's bounding box (0.55 wide, y 0.44..1.46)
+  // and the head keeps the old 0.32 cube's diameter, so the shootable
+  // hitbox is the same shape in the same place — only the silhouette
+  // changes. Every new part is visual only and is never added to
+  // G.shootables; arms/legs/visor/pads keep their v6 roles.
   const g = new THREE.Group();
-  const suit = team === 'atk' ? 0x8a6f3c : 0x2e6f6a;
-  const suitDark = team === 'atk' ? 0x5d4a26 : 0x1e4a45;
-  const skin = team === 'atk' ? 0xc9a24d : 0x4d9a92;
-  const accent = team === 'atk' ? 0xf0a830 : 0x3ec6b8;
+  const suit = team === 'atk' ? PAL.tSuit : PAL.ctSuit;
+  const suitDark = team === 'atk' ? PAL.tDark : PAL.ctDark;
+  const helm = team === 'atk' ? PAL.tHelm : PAL.ctHelm;
+  const accent = team === 'atk' ? PAL.tAccent : PAL.ctAccent;
   const bodyMat = new THREE.MeshStandardMaterial({ color: suit, roughness: 0.75 });
   const darkMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.8 });
-  const headMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.65 });
+  const helmMat = new THREE.MeshStandardMaterial({ color: helm, roughness: 0.6 });
+  const vestMat = new THREE.MeshStandardMaterial({ color: suitDark, roughness: 0.85 });
   const accMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5, emissive: accent, emissiveIntensity: 0.3 });
   const gunMat = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.5 });
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.5, 4, 10), bodyMat);
   body.position.y = 0.95;
   body.castShadow = true;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), headMat);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), bodyMat);
   head.position.y = 1.62;
   head.castShadow = true;
-  // Visor slit on the face (bots face local -z).
+  // Helmet dome + brim over the head (bots face local -z).
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), helmMat);
+  helmet.position.y = 1.66;
+  helmet.castShadow = true;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 12), helmMat);
+  brim.position.y = 1.66;
+  // Visor slit on the face, under the brim.
   const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.06), accMat);
   visor.position.set(0, 1.64, -0.15);
+  // Tactical vest: front + back plates hugging the torso, with two
+  // magazine pouches on the chest.
+  const vestF = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.05), vestMat);
+  vestF.position.set(0, 1.02, -0.24);
+  const vestB = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.05), vestMat);
+  vestB.position.set(0, 1.02, 0.24);
+  const pouchGeo = new THREE.BoxGeometry(0.12, 0.14, 0.05);
+  const pouchL = new THREE.Mesh(pouchGeo, darkMat);
+  pouchL.position.set(-0.11, 1.0, -0.28);
+  const pouchR = new THREE.Mesh(pouchGeo, darkMat);
+  pouchR.position.set(0.11, 1.0, -0.28);
+  // Backpack + bedroll on the back.
+  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.14), vestMat);
+  pack.position.set(0, 1.08, 0.31);
+  const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.34, 8), darkMat);
+  roll.rotation.z = Math.PI / 2;
+  roll.position.set(0, 1.32, 0.31);
+  // Belt around the waist and knee pads on the legs.
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 12), darkMat);
+  belt.position.y = 0.72;
+  const kneeGeo = new THREE.SphereGeometry(0.08, 8, 6);
+  const kneeL = new THREE.Mesh(kneeGeo, darkMat);
+  kneeL.position.set(-0.13, 0.52, -0.08);
+  const kneeR = new THREE.Mesh(kneeGeo, darkMat);
+  kneeR.position.set(0.13, 0.52, -0.08);
   const padGeo = new THREE.SphereGeometry(0.11, 8, 6);
   const padL = new THREE.Mesh(padGeo, accMat);
   padL.position.set(-0.3, 1.38, 0);
@@ -70,7 +104,16 @@ function makeMesh(team) {
   legR.position.set(0.13, 0.28, 0);
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.55), gunMat);
   gun.position.set(0.18, 1.22, -0.32);
-  g.add(body, head, visor, padL, padR, armL, armR, legL, legR, gun);
+  // Rifle furniture on the held gun: magazine under the receiver and a
+  // barrel poking past the muzzle, so it reads as a rifle, not a box.
+  const gunMag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.08), gunMat);
+  gunMag.position.set(0.18, 1.12, -0.28);
+  const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8), gunMat);
+  gunBarrel.rotation.x = Math.PI / 2;
+  gunBarrel.position.set(0.18, 1.24, -0.62);
+  g.add(body, head, helmet, brim, visor, vestF, vestB, pouchL, pouchR,
+    pack, roll, belt, kneeL, kneeR, padL, padR, armL, armR, legL, legR,
+    gun, gunMag, gunBarrel);
   return { group: g, body, head, legL, legR, armL, armR };
 }
 
