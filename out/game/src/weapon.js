@@ -50,6 +50,7 @@ export function createViewModel(camera) {
 }
 
 // One hitscan ray. Returns the agent hit (or null). Walls stop the bullet.
+// Friendly fire is off: a teammate's hitbox never stops the ray.
 export function hitscanShot(G, shooter, origin, dir, spread) {
   const dx = (G.rng() - 0.5) * 2 * spread;
   const dy = (G.rng() - 0.5) * 2 * spread;
@@ -60,10 +61,15 @@ export function hitscanShot(G, shooter, origin, dir, spread) {
   _ray.far = 120;
   const targets = [...G.world.solids, ...G.shootables];
   const hits = _ray.intersectObjects(targets, false);
-  if (hits.length === 0) return null;
-  const h = hits[0];
-  const ud = h.object.userData;
-  if (ud.agent !== undefined && ud.agent !== shooter && ud.agent.alive) return { agent: ud.agent, part: ud.part ?? 'torso' };
+  for (const h of hits) {
+    const ud = h.object.userData;
+    if (ud.agent !== undefined) {
+      if (ud.agent === shooter || !ud.agent.alive) continue;
+      if (ud.agent.team === shooter.team) continue; // friendly fire off
+      return { agent: ud.agent, part: ud.part ?? 'torso' };
+    }
+    return null; // a wall stops the bullet
+  }
   return null;
 }
 
