@@ -45,6 +45,9 @@ export function killAgent(G, target, attacker, part) {
     G.bomb.carrier = null;
     G.bomb.dropped = target.pos.clone();
     G.bomb.dropped.y = 0;
+    // The state must switch too: stepBomb and the bot pickup branch only
+    // recover a bomb in 'dropped' state, so without this the drop was dead code.
+    G.bomb.state = 'dropped';
   }
   // A death is the loudest thing on the map: nearby bots turn toward it.
   if (G.noise) G.noise(target.pos, 30);

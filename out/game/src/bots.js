@@ -118,6 +118,9 @@ function radio(G, b, text) {
 function botShoot(G, b, dt) {
   const t = b.target;
   if (!t || !t.alive) return;
+  // Hold fire without line of sight: the target memory lasts 1.5s, and
+  // shooting through cover or smoke in that window was unfair.
+  if (!canSee(G, b, t)) return;
   b.cool -= dt;
   if (b.cool > 0) return;
   if (b.burstLeft <= 0) {
@@ -182,11 +185,15 @@ export function stepBots(G, dt) {
         }
       }
       if (best) {
-        if (b.target !== best) radio(G, b, `Contact ${best.isPlayer ? 'player' : best.name} — ${b.site ?? 'mid'}`);
+        if (b.target !== best) {
+          radio(G, b, `Contact ${best.isPlayer ? 'player' : best.name} — ${b.site ?? 'mid'}`);
+          // Reaction time starts once, on first sighting. Resetting it every
+          // think tick (0.15s < reactionMin 0.25s) meant bots never fired.
+          b.reactT = CFG.bot.reactionMin + G.rng() * (CFG.bot.reactionMax - CFG.bot.reactionMin);
+        }
         b.target = best;
         b.lastSeen = best.pos.clone();
         b.lastSeenT = 0;
-        b.reactT = CFG.bot.reactionMin + G.rng() * (CFG.bot.reactionMax - CFG.bot.reactionMin);
         b.state = 'engage';
       } else if (b.target) {
         b.lastSeenT += CFG.bot.thinkEvery;
@@ -206,13 +213,13 @@ export function stepBots(G, dt) {
       } else if (b.state !== 'engage' && b.state !== 'defuse') {
         b.state = 'route';
         b.destNode = siteNode;
-        if (b.pathI >= b.path.length) b.path = findPath(nearestNode(b.pos.x, b.pos.z), siteNode);
+        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), siteNode); b.pathI = 0; }
       }
     } else if (b.team === 'atk' && bomb.carrier === b && bomb.state === 'carried') {
       if (b.state !== 'engage' && b.state !== 'plant') {
         b.state = 'route';
         b.destNode = SITE_NODE[b.site];
-        if (b.pathI >= b.path.length) b.path = findPath(nearestNode(b.pos.x, b.pos.z), SITE_NODE[b.site]);
+        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), SITE_NODE[b.site]); b.pathI = 0; }
       }
       const site = G.world.sites[b.site];
       if (Math.abs(b.pos.x - site.center.x) < site.size / 2 && Math.abs(b.pos.z - site.center.z) < site.size / 2) {
@@ -223,7 +230,7 @@ export function stepBots(G, dt) {
       if (b.state !== 'engage') {
         b.state = 'route';
         b.destNode = nearestNode(bomb.dropped.x, bomb.dropped.z);
-        if (b.pathI >= b.path.length) b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode);
+        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode); b.pathI = 0; }
         if (b.pos.distanceTo(bomb.dropped) < 1.2) {
           bomb.carrier = b; bomb.dropped = null; bomb.state = 'carried';
           radio(G, b, 'Picked up the charge');
