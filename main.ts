@@ -2,7 +2,7 @@
 // Node 22, standard library only. Copies game/ and screenshots/ into the
 // output directory and writes dossier.json with the kit's buildDossier.
 // OUT is /output, or MAKEFUN_OUTPUT_DIR when that is set (local runs).
-import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-threejs.ts';
@@ -13,8 +13,14 @@ import { buildDossier } from './vendor/makefun-threejs.ts';
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const out = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
-rmSync(out, { recursive: true, force: true });
+// Empty the output directory's CONTENTS, never the directory itself:
+// the grader runs as a user who can write inside /output but cannot
+// remove /output (its parent is not writable by them), so rmSync(out)
+// fails with EPERM. The kit starter never removes the out dir either.
 mkdirSync(out, { recursive: true });
+for (const entry of readdirSync(out)) {
+  rmSync(resolve(out, entry), { recursive: true, force: true });
+}
 cpSync(resolve(here, 'game'), resolve(out, 'game'), { recursive: true });
 cpSync(resolve(here, 'screenshots'), resolve(out, 'screenshots'), { recursive: true });
 writeFileSync(
