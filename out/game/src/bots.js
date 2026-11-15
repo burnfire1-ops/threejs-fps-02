@@ -11,7 +11,7 @@ import { damageAgent } from './combat.js';
 import { playShot } from './audio.js';
 import { losBlocked, resolveMove } from './world.js';
 import { nearestNode, findPath, nodePos, SITE_NODE, SPAWN_NODE, HOLD_NODES } from './nav.js';
-import { smokeBlocks } from './grenade.js';
+import { smokeBlocks, throwGrenade } from './grenade.js';
 
 const _eye = new THREE.Vector3();
 const _chest = new THREE.Vector3();
@@ -47,7 +47,7 @@ export function createBots(G) {
         money: 0, kit: false, grenades: { he: 0, smoke: 0 },
         weapons: {}, cur: 'pistol', bloom: 0,
         mesh: group, state: 'route', path: [], pathI: 0,
-        destNode: SPAWN_NODE[team], holdT: 0, thinkT: Math.random() * 0.15,
+        destNode: SPAWN_NODE[team], pathDest: null, holdT: 0, thinkT: Math.random() * 0.15,
         target: null, reactT: 0, burstLeft: 0, burstPause: 0, cool: 0,
         lastSeen: null, lastSeenT: 0, heardPos: null, heardT: 0,
         plantT: 0, defuseT: 0, radioCd: 0, strafe: 1, strafeT: 0,
@@ -89,6 +89,7 @@ export function resetBotsForRound(G) {
     b.destNode = b.team === 'atk' ? SITE_NODE[b.site] : HOLD_NODES[(b.id * 2) % HOLD_NODES.length];
     b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode);
     b.pathI = 0;
+    b.pathDest = b.destNode;
     b.mesh.position.copy(b.pos);
     b.yaw = b.team === 'atk' ? 0 : Math.PI;
   }
@@ -133,7 +134,12 @@ function botShoot(G, b, dt) {
   b.cool = w.gap * 1.6;
   b.burstLeft--;
   const st = b.weapons[b.cur];
-  if (!st || st.mag <= 0) { // reload instead of shooting blanks
+  if (!st) return;
+  // A reload already runs: let stepReloads finish it. Resetting the timer
+  // here on every shot attempt meant a bot that emptied its magazine while
+  // engaging never finished reloading.
+  if (st.reloading > 0) return;
+  if (st.mag <= 0) { // reload instead of shooting blanks
     st.reloading = w.reload;
     return;
   }
@@ -156,6 +162,21 @@ function botShoot(G, b, dt) {
   }
 }
 
+// Re-route immediately when the destination changes: finishing the old
+// path first made bots ignore urgent objectives (plant response, dropped
+// bomb) until the old route ended.
+function setDest(G, b, node) {
+  if (b.pathDest !== node) {
+    b.destNode = node;
+    b.path = findPath(nearestNode(b.pos.x, b.pos.z), node);
+    b.pathI = 0;
+    b.pathDest = node;
+  } else if (b.pathI >= b.path.length) {
+    b.path = findPath(nearestNode(b.pos.x, b.pos.z), node);
+    b.pathI = 0;
+  }
+}
+
 function moveToward(G, b, tx, tz, dt, speed) {
   const dx = tx - b.pos.x, dz = tz - b.pos.z;
   const d = Math.hypot(dx, dz);
@@ -171,6 +192,9 @@ function moveToward(G, b, tx, tz, dt, speed) {
 export function stepBots(G, dt) {
   for (const b of G.bots) {
     if (!b.alive) continue;
+    // Freeze time: bots stay at spawn. (Perception and shooting are
+    // already gated on 'live'; movement was not.)
+    if (G.round.state === 'freeze') { b.vel.set(0, 0, 0); b.mesh.position.copy(b.pos); continue; }
     b.radioCd -= dt;
     b.thinkT -= dt;
     // --- perception, staggered (only live rounds: no fighting in freeze) ---
@@ -202,35 +226,38 @@ export function stepBots(G, dt) {
     }
     // --- bomb logic overrides movement ---
     const bomb = G.bomb;
-    if (b.team === 'atk' && bomb.planted && bomb.state === 'planted') {
+    if (b.team === 'atk' && bomb.state === 'planted') {
       // Attackers guard the planted bomb.
       if (b.state !== 'engage') { b.state = 'hold'; b.destNode = bomb.site === 'A' ? SITE_NODE.A : SITE_NODE.B; }
-    } else if (b.team === 'def' && bomb.planted && bomb.state === 'planted') {
+    } else if (b.team === 'def' && bomb.state === 'planted') {
       const siteNode = bomb.site === 'A' ? SITE_NODE.A : SITE_NODE.B;
       const d = Math.hypot(b.pos.x - bomb.pos.x, b.pos.z - bomb.pos.z);
       if (d < 1.6 && b.state !== 'engage') {
         b.state = 'defuse';
       } else if (b.state !== 'engage' && b.state !== 'defuse') {
         b.state = 'route';
-        b.destNode = siteNode;
-        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), siteNode); b.pathI = 0; }
+        setDest(G, b, siteNode);
       }
     } else if (b.team === 'atk' && bomb.carrier === b && bomb.state === 'carried') {
       if (b.state !== 'engage' && b.state !== 'plant') {
         b.state = 'route';
-        b.destNode = SITE_NODE[b.site];
-        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), SITE_NODE[b.site]); b.pathI = 0; }
+        setDest(G, b, SITE_NODE[b.site]);
       }
       const site = G.world.sites[b.site];
       if (Math.abs(b.pos.x - site.center.x) < site.size / 2 && Math.abs(b.pos.z - site.center.z) < site.size / 2) {
+        if (b.state !== 'plant' && b.grenades.smoke > 0) {
+          // Cover the plant: one smoke toward the site centre.
+          const dx = site.center.x - b.pos.x, dz = site.center.z - b.pos.z;
+          b.yaw = Math.atan2(-dx, -dz);
+          throwGrenade(G, b, 'smoke');
+        }
         b.state = 'plant';
         radio(G, b, `Planting at ${b.site}`);
       }
     } else if (b.team === 'atk' && !bomb.carrier && bomb.dropped && bomb.state === 'dropped') {
       if (b.state !== 'engage') {
         b.state = 'route';
-        b.destNode = nearestNode(bomb.dropped.x, bomb.dropped.z);
-        if (b.pathI >= b.path.length) { b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode); b.pathI = 0; }
+        setDest(G, b, nearestNode(bomb.dropped.x, bomb.dropped.z));
         if (b.pos.distanceTo(bomb.dropped) < 1.2) {
           bomb.carrier = b; bomb.dropped = null; bomb.state = 'carried';
           radio(G, b, 'Picked up the charge');
@@ -238,6 +265,10 @@ export function stepBots(G, dt) {
       }
     }
     // --- state behaviour ---
+    // Plant/defuse progress is lost the moment the bot stops planting or
+    // defusing: it must hold still and uninterrupted for the full time.
+    if (b.state !== 'plant') b.plantT = 0;
+    if (b.state !== 'defuse') b.defuseT = 0;
     if (b.state === 'engage' && b.target && b.target.alive) {
       const t = b.target;
       _tmp.set(t.pos.x - b.pos.x, 0, t.pos.z - b.pos.z);
@@ -269,9 +300,7 @@ export function stepBots(G, dt) {
       // Attackers holding a site they reached without the bomb rotate on.
       if (b.team === 'atk' && b.destNode === SITE_NODE[b.site] && bomb.carrier !== b && bomb.state === 'carried') {
         b.state = 'route';
-        b.destNode = HOLD_NODES[(b.id + G.round.num) % HOLD_NODES.length];
-        b.path = findPath(nearestNode(b.pos.x, b.pos.z), b.destNode);
-        b.pathI = 0;
+        setDest(G, b, HOLD_NODES[(b.id + G.round.num) % HOLD_NODES.length]);
       }
     } else if (b.state === 'react') {
       const goal = b.heardPos ?? b.lastSeen;

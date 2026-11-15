@@ -8,6 +8,7 @@ import { damageAgent } from './combat.js';
 import { playShot, playReload, playDry } from './audio.js';
 
 const _dir = new THREE.Vector3();
+const _shotDir = new THREE.Vector3();
 const _origin = new THREE.Vector3();
 const _ray = new THREE.Raycaster();
 
@@ -54,10 +55,12 @@ export function createViewModel(camera) {
 export function hitscanShot(G, shooter, origin, dir, spread) {
   const dx = (G.rng() - 0.5) * 2 * spread;
   const dy = (G.rng() - 0.5) * 2 * spread;
-  _dir.copy(dir);
-  _dir.x += dx; _dir.y += dy; _dir.z += (G.rng() - 0.5) * 2 * spread;
-  _dir.normalize();
-  _ray.set(origin, _dir);
+  // Perturb a scratch copy: mutating the caller's vector made each shotgun
+  // pellet start from the previous pellet's already-randomised direction.
+  _shotDir.copy(dir);
+  _shotDir.x += dx; _shotDir.y += dy; _shotDir.z += (G.rng() - 0.5) * 2 * spread;
+  _shotDir.normalize();
+  _ray.set(origin, _shotDir);
   _ray.far = 120;
   const targets = [...G.world.solids, ...G.shootables];
   const hits = _ray.intersectObjects(targets, false);

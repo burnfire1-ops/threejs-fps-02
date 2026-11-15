@@ -32,14 +32,17 @@ export function stepPlayer(G, dt) {
   const inp = G.input;
   if (!p.alive || G.round.state === 'post') return;
   const c = CFG.player;
+  // Freeze time: no movement (CS freeze), but the player can still look
+  // around and use the buy menu.
+  const frozen = G.round.state === 'freeze';
   // Crouch + aim from input.
   p.crouching = inp.keys.has('ControlLeft') || inp.keys.has('KeyC');
   p.aiming = inp.mouseRight;
   const speed = (p.crouching ? c.crouch : c.walk) * (p.aiming ? 0.7 : 1)
     * (CFG.weapons[p.cur]?.moveSpeed ?? c.walk) / c.walk;
   // Wish direction from keys, relative to yaw.
-  const f = (inp.keys.has('KeyW') ? 1 : 0) - (inp.keys.has('KeyS') ? 1 : 0);
-  const s = (inp.keys.has('KeyD') ? 1 : 0) - (inp.keys.has('KeyA') ? 1 : 0);
+  const f = frozen ? 0 : (inp.keys.has('KeyW') ? 1 : 0) - (inp.keys.has('KeyS') ? 1 : 0);
+  const s = frozen ? 0 : (inp.keys.has('KeyD') ? 1 : 0) - (inp.keys.has('KeyA') ? 1 : 0);
   const sin = Math.sin(p.yaw); const cos = Math.cos(p.yaw);
   let wx = -sin * f + cos * s;
   let wz = -cos * f - sin * s;
@@ -54,7 +57,7 @@ export function stepPlayer(G, dt) {
   if (hs > speed) { p.vel.x *= speed / hs; p.vel.z *= speed / hs; }
   // Gravity + jump.
   p.vel.y -= c.gravity * dt;
-  if (inp.keys.has('Space') && p.onGround && p.pos.y <= 0.01) {
+  if (!frozen && inp.keys.has('Space') && p.onGround && p.pos.y <= 0.01) {
     p.vel.y = c.jump;
     p.onGround = false;
   }
