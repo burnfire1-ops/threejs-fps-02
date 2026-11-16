@@ -1,7 +1,7 @@
-// bomb.js — the objective. Attackers carry the charge, hold E for 3 s
-// inside a site to plant it; the 40 s fuse beeps faster as it runs out and
-// the blast wins the round. Defenders hold E for 5 s (2.5 s with a kit) to
-// defuse. A dead carrier drops the charge; any attacker can pick it up.
+// bomb.js — the objective. Attackers hold E for 3 s inside a site to plant; the
+// 40 s fuse beeps faster as it runs out and the blast wins the round. Defenders
+// hold E for 5 s (2.5 s with a kit) to defuse. A dead carrier drops the charge;
+// any attacker can pick it up.
 import * as THREE from 'three';
 import { CFG } from './config.js';
 import { playBeep, playExplode, playPlant, playDefuse } from './audio.js';
@@ -43,8 +43,8 @@ export function plantBomb(G, agent, site) {
   b.mesh.visible = true;
   b.plantProgress = 0;
   playPlant(G);
-  G.radio.unshift({ text: `Charge planted at ${site}`, t: 6, team: 'atk' });
-  if (G.radio.length > 4) G.radio.pop();
+  G.radio.unshift({ text: `Charge planted at ${site}`, t: 5, team: 'atk' });
+  if (G.radio.length > 3) G.radio.pop();
 }
 
 export function defuseBomb(G, agent) {
@@ -80,7 +80,8 @@ export function stepBomb(G, dt) {
       b.state = 'carried';
       b.carrier = G.player;
       b.dropped = null;
-      G.radio.unshift({ text: 'You picked up the charge', t: 4, team: 'atk' });
+      G.radio.unshift({ text: 'You picked up the charge', t: 5, team: 'atk' });
+      if (G.radio.length > 3) G.radio.pop();
     }
   }
   if (b.state === 'dropped' && b.dropped) {
@@ -99,8 +100,7 @@ export function stepBomb(G, dt) {
   if (b.fuse <= 0) detonate(G);
 }
 
-// Player holding E: plant (attacker, carrying, inside a site) or defuse
-// (defender, bomb planted, close to it). Called every fixed step.
+// Player holding E: plant (attacker, carrying, inside a site) or defuse (defender, bomb planted, close to it). Called every fixed step.
 export function stepPlayerInteract(G, dt) {
   const b = G.bomb;
   const p = G.player;

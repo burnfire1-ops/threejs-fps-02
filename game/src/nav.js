@@ -1,6 +1,6 @@
-// nav.js — waypoint graph for the bots. Nodes sit at every junction, lane
-// entry, site and spawn; edges follow the lanes (never through walls).
-// Bots pathfind with BFS and walk node to node with a little jitter.
+// nav.js — waypoint graph for the bots. Nodes sit at every junction, lane entry, site
+// and spawn; edges follow the lanes (never through walls). Bots pathfind with BFS and
+// walk node to node with a little jitter.
 import * as THREE from 'three';
 
 // [x, z] per node.

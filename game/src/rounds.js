@@ -1,8 +1,7 @@
-// rounds.js — the round state machine: freeze (buy) -> live -> post, then
-// the next round. First to 8 wins the match (max 15 rounds). A round ends
-// by elimination, detonation, defuse, or timeout (defenders win if the
-// charge never went down; once planted the clock stops and only the bomb
-// decides). Match end shows the final banner and freezes the score.
+// rounds.js — the round state machine: freeze (buy) -> live -> post, then the
+// next round. First to 8 wins the match (max 15 rounds). A round ends by
+// elimination, detonation, defuse, or timeout; once planted, only the bomb
+// decides. Match end shows the final banner and freezes the score.
 import { CFG } from './config.js';
 import { awardRound } from './economy.js';
 import { resetBotsForRound } from './bots.js';
@@ -39,7 +38,7 @@ export function startRound(G) {
   // Keep weapons and money between rounds; refresh the starter pistol.
   if (!p.weapons.pistol) {
     const w = CFG.weapons.pistol;
-    p.weapons.pistol = { mag: w.mag, reserve: w.reserve, reloading: 0 };
+    p.weapons.pistol = { mag: w.mag, reserve: w.reserve, reloading: 0, cooldown: 0 };
     p.cur = 'pistol';
   }
   resetBotsForRound(G);
@@ -55,10 +54,9 @@ export function startRound(G) {
   G.killFeed.length = 0;
 }
 
-// Rematch (v6-full-fix): the end screen promises "press R for a rematch",
-// so R really restarts the match. startRound keeps weapons and money
-// between rounds, so a fresh match resets them explicitly first. Bots get
-// their equipment from the round number, so r.num = 1 handles them.
+// Rematch: the end screen promises "press R for a rematch", so R really restarts
+// the match. startRound keeps weapons and money between rounds, so a fresh match
+// resets them explicitly first; bots get their equipment from the round number, so r.num = 1 handles them.
 export function rematch(G) {
   const r = G.round;
   r.scoreAtk = 0; r.scoreDef = 0;
@@ -116,12 +114,10 @@ export function stepRounds(G, dt) {
     }
     return;
   }
-  // Live: elimination, timeout. The clock stops once the charge is planted.
-  // Once planted, only the bomb decides: if every attacker is dead the
-  // round still runs until defuse or detonation. (The old code ended it
-  // instantly by elimination, so a planted charge could never detonate
-  // after its team died.) Defender elimination still ends the round when
-  // planted: with nobody left to defuse, the attackers win either way.
+  // Live: elimination, timeout. The clock stops once the charge is planted:
+  // only the bomb decides — the round still runs until defuse or detonation
+  // even if every attacker is dead. Defender elimination still ends the round
+  // when planted: with nobody left to defuse, the attackers win either way.
   const atkAlive = G.agents.some((a) => a.team === 'atk' && a.alive);
   const defAlive = G.agents.some((a) => a.team === 'def' && a.alive);
   if (!atkAlive && G.bomb.state !== 'planted') { endRound(G, 'def', 'elimination'); return; }

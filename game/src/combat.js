@@ -1,6 +1,5 @@
-// combat.js — damage with headshots and armor, death, kill feed.
-// Headshots multiply torso damage (x4 on most weapons); armor absorbs half
-// of what remains and wears down. Friendly fire is off.
+// combat.js — damage with headshots and armor, death, kill feed. Headshots multiply
+// torso damage (x4 on most weapons); armor absorbs half of what remains and wears down. Friendly fire is off.
 import { CFG } from './config.js';
 import { playHit } from './audio.js';
 
@@ -34,7 +33,7 @@ export function killAgent(G, target, attacker, part) {
   if (target === G.player) G.playerDied = true;
   const atkName = attacker ? attacker.name : 'World';
   const line = `${atkName} ${part === 'head' ? '◉' : '✕'} ${target.name}`;
-  G.killFeed.unshift({ text: line, t: 5, byPlayer: attacker?.isPlayer, victimPlayer: target.isPlayer });
+  G.killFeed.unshift({ text: line, t: 6, byPlayer: attacker?.isPlayer, victimPlayer: target.isPlayer, killer: atkName, victim: target.name, weapon: attacker ? CFG.weapons[attacker.cur]?.name ?? '' : 'HE', head: part === 'head' });
   if (G.killFeed.length > 5) G.killFeed.pop();
   if (attacker?.isPlayer && attacker !== target) {
     attacker.money += CFG.economy.kill;
@@ -45,8 +44,7 @@ export function killAgent(G, target, attacker, part) {
     G.bomb.carrier = null;
     G.bomb.dropped = target.pos.clone();
     G.bomb.dropped.y = 0;
-    // The state must switch too: stepBomb and the bot pickup branch only
-    // recover a bomb in 'dropped' state, so without this the drop was dead code.
+    // The state must switch too: stepBomb and the bot pickup branch only recover a bomb in 'dropped' state, so without this the drop was dead code.
     G.bomb.state = 'dropped';
   }
   // A death is the loudest thing on the map: nearby bots turn toward it.

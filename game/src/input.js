@@ -1,7 +1,6 @@
-// input.js — keyboard, mouse and pointer lock. All state lives in G.input;
-// modules read it, none of them touches the DOM events themselves.
-// Keys: WASD move, Space jump, Ctrl/C crouch, R reload, B buy menu,
-// E plant/defuse, G grenade, 1-6 weapons, 7-0 gear, M mute, Tab scoreboard.
+// input.js — keyboard, mouse and pointer lock. All state lives in G.input; modules
+// read it, none touches the DOM events themselves. Keys: WASD move, Space jump, Ctrl/C
+// crouch, R reload, B buy menu, E plant/defuse, G grenade, 1-6 weapons, 7-0 gear, M mute, Tab scoreboard.
 export function createInput() {
   return {
     keys: new Set(),

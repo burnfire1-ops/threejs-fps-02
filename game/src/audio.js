@@ -1,7 +1,6 @@
-// audio.js — every sound is synthesized with WebAudio: no audio files, so
-// the no-network gate is trivially satisfied. The context starts on the
-// first user gesture; until then calls are silent no-ops (the screenshot
-// harness never clicks, and that is fine).
+// audio.js — every sound is synthesized with WebAudio: no audio files, so the
+// no-network gate is trivially satisfied. The context starts on the first user
+// gesture; until then calls are silent no-ops.
 let ctx = null;
 let master = null;
 let muted = false;
@@ -54,8 +53,7 @@ function noise(G, dur, filterFreq, vol = 0.5, type = 'lowpass') {
   src.start();
 }
 
-// Distance attenuation for world sounds (bots, explosions): full up close,
-// a floor of 0.12 past 40 m.
+// Distance attenuation for world sounds (bots, explosions): full up close, a floor of 0.12 past 40 m.
 function volAt(G, pos) {
   if (!pos) return 1;
   const d = G.player.pos.distanceTo(pos);

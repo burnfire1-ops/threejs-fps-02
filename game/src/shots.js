@@ -1,8 +1,7 @@
-// shots.js — deterministic screenshot scenarios for ?shot=.
-// start: title overlay over the map. play: mid-round, a bot in the sights,
-// a shot going off. plant: the charge going down at site A with a defender
-// closing in. end: match over, scoreboard up. Each mode sets fixed
-// positions and a seeded RNG, so the same seed renders the same frame.
+// shots.js — deterministic screenshot scenarios for ?shot=. start: title overlay
+// over the map. play: mid-round, a bot in the sights, a shot going off. plant: the
+// charge going down at site A with a defender closing in. end: match over,
+// scoreboard up. Each mode sets fixed positions and a seeded RNG, so the same seed renders the same frame.
 export function applyShot(G, mode) {
   const p = G.player;
   const bots = G.bots;
@@ -25,7 +24,7 @@ export function applyShot(G, mode) {
     p.pitch = 0;
     p.money = 3150;
     p.cur = 'rifle';
-    if (!p.weapons.rifle) p.weapons.rifle = { mag: 30, reserve: 90, reloading: 0 };
+    if (!p.weapons.rifle) p.weapons.rifle = { mag: 30, reserve: 90, reloading: 0, cooldown: 0 };
     p.weapons.rifle.mag = 24;
     // One enemy mid-lane in the sights, one teammate on the left.
     def[0].pos.set(0.5, 0, 2);

@@ -1,5 +1,4 @@
-// config.js — every tuning number in one place. Gameplay reads from here;
-// logic never hardcodes a number that a designer would want to change.
+// config.js — every tuning number in one place. Gameplay reads from here; logic never hardcodes a number that a designer would want to change.
 export const CFG = {
   map: { half: 20, wallH: 4.6 },
   player: {
@@ -12,8 +11,7 @@ export const CFG = {
     lossStreak: 500, lossStreakMax: 3,
   },
   bomb: { plantTime: 3, fuse: 40, defuseTime: 5, defuseKitTime: 2.5 },
-  // Six weapons. dmg = torso damage; head multiplies by headMul.
-  // gap = seconds between shots; spread in radians (still / moving).
+  // Six weapons. dmg = torso damage; head multiplies by headMul. gap = seconds between shots; spread in radians (still / moving).
   weapons: {
     pistol: { name: 'P9 Sidearm', dmg: 26, headMul: 4, gap: 0.15, mag: 12, reserve: 36, reload: 1.4, spreadStill: 0.004, spreadMove: 0.02, price: 500, auto: false, moveSpeed: 5.2, pellets: 1, kick: 0.011 },
     smg: { name: 'VK-9', dmg: 22, headMul: 4, gap: 0.075, mag: 30, reserve: 90, reload: 1.8, spreadStill: 0.006, spreadMove: 0.03, price: 1500, auto: true, moveSpeed: 5.0, pellets: 1, kick: 0.008 },

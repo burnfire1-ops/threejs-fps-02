@@ -21,45 +21,79 @@
   #hitmarker { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(45deg); font-size:22px; opacity:0; color:#fff; text-shadow:0 0 3px #000; }
   #dmg { position:absolute; inset:0; box-shadow:inset 0 0 90px 30px rgba(255,40,40,.55); opacity:0; }
   #dmgdir { position:absolute; left:50%; top:50%; width:150px; height:150px; margin:-75px 0 0 -75px; border-radius:50%; border-top:6px solid var(--red); opacity:0; }
-  .panel { background:rgba(20,22,26,.78); border:1px solid #2c323a; border-radius:4px; padding:8px 10px; }
-  #vitals { position:absolute; left:16px; bottom:16px; min-width:210px; }
-  #vitals .row { display:flex; justify-content:space-between; gap:10px; font-size:14px; }
-  #hp-num { font-size:26px; font-weight:700; }
+  .panel { background:rgba(20,22,26,.78); border:1px solid #2c323a; border-radius:4px; padding:6px 8px; }
+  /* HUD reference build: angular panels (clip-path cut corners, no border). */
+  .ang { clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px); border:0; }
+  #vitals { position:absolute; left:16px; bottom:16px; min-width:170px; padding:5px 6px; }
+  #vitals .vit-row { display:flex; align-items:center; gap:9px; font-size:11px; }
+  #vitals .vit-row b { font-size:18px; font-weight:700; }
+  #vitals .shield { width:9px; height:11px; }
+  #vitals .bar { margin:5px 0 5px; }
   .bar { height:5px; background:#2c323a; border-radius:2px; overflow:hidden; margin:3px 0 6px; }
   .bar i { display:block; height:100%; background:var(--accent); }
-  #armor-bar i { background:var(--teal); }
-  #ammo { position:absolute; right:16px; bottom:16px; text-align:right; }
-  #ammo-mag { font-size:30px; font-weight:700; }
-  #ammo-res { font-size:15px; color:var(--muted); }
-  #weapon-name { font-size:12px; color:var(--muted); letter-spacing:1px; }
-  #topbar { position:absolute; top:12px; left:50%; transform:translateX(-50%); text-align:center; }
-  #timer { font-size:24px; font-weight:700; }
-  #score-line { font-size:14px; letter-spacing:1px; }
-  #round-label { font-size:11px; color:var(--muted); letter-spacing:2px; }
-  #money { position:absolute; left:16px; top:12px; font-size:18px; font-weight:700; color:var(--accent); }
-  #bomb-status { position:absolute; left:16px; top:44px; font-size:12px; letter-spacing:1px; }
-  #killfeed { position:absolute; right:16px; top:186px; text-align:right; font-size:13px; line-height:1.5; }
-  #killfeed .kf-me { color:var(--accent); }
-  #radio { position:absolute; right:16px; bottom:110px; text-align:right; font-size:12px; line-height:1.6; color:var(--muted); }
+  #hp-bar { background:#fff; }
+  #ammo { position:absolute; right:16px; bottom:16px; text-align:right; padding:5px 6px; }
+  #ammo-mag { font-size:21px; font-weight:700; }
+  #ammo-res { font-size:11px; color:var(--muted); }
+  #weapon-name { font-size:9px; color:var(--muted); letter-spacing:1px; }
+  #grenades { font-size:9px; color:var(--muted); letter-spacing:1px; }
+  /* Status pill top-left (FPS + timer, live). No ping: the game is offline. */
+  #status-pill { position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:1px; background:rgba(20,22,26,.85); padding:2px 7px; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  /* Score bar: angular hexagon, blue EMBER / dark middle / red ASH, shields. */
+  #topbar { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; align-items:stretch; text-align:center; background:rgba(20,22,26,.9); clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%); }
+  .sb-team { display:flex; align-items:center; gap:5px; padding:5px 10px; font-size:17px; font-weight:700; text-shadow:0 1px 3px #000; }
+  .sb-blue { background:#2f6fb4; } .sb-red { background:#c23a2e; }
+  .sb-mid { padding:2px 10px; }
+  .shield { width:11px; height:13px; background:#fff; clip-path:polygon(50% 0,100% 18%,100% 62%,50% 100%,0 62%,0 18%); }
+  #timer { font-size:17px; font-weight:700; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  #round-label { font-size:10px; color:var(--ink); font-weight:700; letter-spacing:2px; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  /* #money is a small dark bar at BOTTOM-CENTRE, between the vitals panel
+     (bottom-left) and the ammo panel (bottom-right). #bomb-status stays top-left. */
+  #money { position:absolute; left:50%; transform:translateX(-50%); bottom:16px; font-size:13px; font-weight:700; color:var(--accent); background:rgba(20,22,26,.85); border:1px solid #d8a838; border-radius:4px; padding:2px 8px; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  .coin { display:inline-block; width:11px; height:11px; border-radius:50%; background:#d8a838; color:#14161a; font-size:9px; line-height:11px; text-align:center; font-weight:700; margin-right:4px; }
+  #bomb-status { position:absolute; left:16px; top:44px; font-size:9px; letter-spacing:1px; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  /* Radio/killfeed sit 24px off the right edge, smaller type, each line with
+     its own dark translucent backing + text-shadow so it never sits bare on the bright view. */
+  #killfeed { position:absolute; right:24px; top:192px; text-align:right; font-size:9px; line-height:1.5; }
+  #killfeed .kf-me { border:1px solid var(--accent); }
+  #killfeed > div, #radio > div { background:rgba(20,22,26,.55); border-radius:3px; padding:1px 5px; margin:1px 0; text-shadow:0 1px 3px #000; }
+  /* Killfeed pills: killer blue, weapon muted, victim red. */
+  .kf-k { color:#6ea8ff; font-weight:700; } .kf-w { color:var(--muted); font-size:8px; padding:0 4px; } .kf-v { color:#ff6b5e; font-weight:700; }
+  #radio { position:absolute; right:24px; bottom:80px; text-align:right; font-size:13px; line-height:1.6; color:var(--muted); }
   #radio .radio-atk { color:#f0c060; }
   #radio .radio-def { color:#7fd8cf; }
-  #banner { position:absolute; left:50%; top:26%; transform:translateX(-50%); font-size:26px; font-weight:700; letter-spacing:2px; text-shadow:0 2px 8px #000; display:none; }
+  #banner { position:absolute; left:50%; top:26%; transform:translateX(-50%); font-size:22px; font-weight:700; letter-spacing:2px; text-shadow:0 2px 8px #000; display:none; }
   #progress { position:absolute; left:50%; top:58%; transform:translateX(-50%); width:260px; display:none; text-align:center; }
   #progress-label { font-size:12px; letter-spacing:2px; margin-bottom:4px; }
   #progress .bar { height:8px; }
   #progress-fill { background:var(--accent); }
-  #minimap { position:absolute; right:16px; top:12px; border:1px solid #2c323a; border-radius:4px; background:#101216; }
-  #toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); font-size:13px; color:var(--accent); text-shadow:0 1px 3px #000; }
-  #spectate { position:absolute; left:50%; top:88px; transform:translateX(-50%); font-size:13px; letter-spacing:2px; color:var(--teal); text-shadow:0 1px 3px #000; display:none; }
+  /* Minimap panel top-right: compass strip (N/E/S/W, follows real player yaw)
+     over the canvas, "+" button toggles 1x/2x zoom. Objective panel below it. */
+  #mm-panel { position:absolute; right:16px; top:12px; }
+  #compass { position:relative; width:154px; height:18px; overflow:hidden; background:rgba(20,22,26,.85); border:1px solid #2c323a; border-bottom:0; font-size:12px; line-height:18px; color:var(--muted); }
+  #compass-inner { position:absolute; top:0; height:18px; }
+  #compass-inner span { position:absolute; transform:translateX(-50%); }
+  #compass::after { content:''; position:absolute; left:50%; top:0; width:6px; height:18px; margin-left:-3px; background:var(--accent); }
+  #minimap { display:block; border:1px solid #2c323a; background:#101216; }
+  #mm-zoom { position:absolute; right:12px; bottom:12px; width:24px; height:24px; pointer-events:auto; cursor:pointer; background:rgba(20,22,26,.85); color:var(--ink); border:1px solid #3a4048; border-radius:2px; font:700 18px/21px monospace; }
+  #objective { position:absolute; left:16px; top:70px; font-size:9px; letter-spacing:1px; color:var(--accent); background:rgba(20,22,26,.85); padding:3px 6px; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  #toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); font-size:12px; color:var(--accent); text-shadow:0 1px 3px #000; }
+  /* Spectate label at bottom-centre, above the toast (bottom:120px), so it
+     can never stack with the banner at top:26%. */
+  #spectate { position:absolute; left:50%; bottom:160px; transform:translateX(-50%); font-size:12px; letter-spacing:2px; color:var(--teal); text-shadow:0 1px 3px #000; display:none; }
   #buy-hint { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); font-size:13px; color:var(--muted); display:none; }
   #buymenu { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:420px; display:none; pointer-events:none; }
   #buymenu h2 { font-size:15px; letter-spacing:2px; margin-bottom:2px; }
   #buy-money { font-size:18px; color:var(--accent); margin-bottom:8px; }
-  .buy-item { display:flex; justify-content:space-between; font-size:13px; padding:5px 6px; border-bottom:1px solid #22262b; }
-  .buy-item b { color:var(--accent); width:18px; display:inline-block; }
-  .buy-item span { color:var(--muted); }
-  .buy-item.owned span { color:var(--teal); }
-  #scoreboard { position:absolute; left:50%; top:16%; transform:translateX(-50%); width:460px; display:none; z-index:6; }
+  .buy-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .buy-table th { font-size:11px; letter-spacing:2px; color:var(--muted); text-align:left; padding:5px 6px; border-bottom:1px solid #3a4048; }
+  .buy-table th:last-child { text-align:right; }
+  .buy-table td { padding:5px 6px; border-bottom:1px solid #22262b; }
+  .buy-table td.key { color:var(--accent); font-weight:700; width:22px; }
+  .buy-table td.price { text-align:right; color:var(--muted); }
+  .buy-table tr.owned td.price { color:var(--teal); }
+  /* Scoreboard centred (50%) instead of top:16%, so it never enters the topbar/spectate zone. */
+  #scoreboard { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:460px; display:none; z-index:6; }
   #scoreboard h2 { font-size:14px; letter-spacing:2px; margin-bottom:6px; }
   .sb-row { display:flex; justify-content:space-between; font-size:13px; padding:3px 4px; }
   .sb-row span { flex:1; } .sb-row span:last-child { text-align:right; }
@@ -84,19 +118,23 @@
   <div id="dmgdir"></div>
   <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
   <div id="hitmarker">✕</div>
-  <div id="vitals" class="panel">
-    <div class="row"><span>HEALTH <b id="hp-num">100</b></span><span>ARMOR <b id="armor-num">0</b></span></div>
+  <div id="vitals" class="panel ang">
+    <div class="vit-row"><span class="vit-ico">✚</span><b id="hp-num">100</b><span>HEALTH</span></div>
     <div class="bar"><i id="hp-bar" style="width:100%"></i></div>
+    <div class="vit-row"><span class="vit-ico shield"></span><b id="armor-num">0</b><span>ARMOR</span></div>
     <div class="bar"><i id="armor-bar" style="width:0%"></i></div>
   </div>
-  <div id="ammo" class="panel">
+  <div id="ammo" class="panel ang">
     <div><span id="ammo-mag">12</span><span id="ammo-res"> / 36</span></div>
     <div id="weapon-name">P9 Sidearm</div>
+    <div id="grenades">HE 0 · SMK 0</div>
   </div>
-  <div id="topbar"><div id="timer">1:40</div><div id="score-line">EMBER 0 — 0 ASH</div><div id="round-label">ROUND 1</div></div>
-  <div id="money">$800</div>
+  <div id="topbar"><div class="sb-team sb-blue"><span class="shield"></span><b id="score-atk">0</b></div><div class="sb-mid"><div id="round-label">ROUND 1</div><div id="timer">1:40</div></div><div class="sb-team sb-red"><b id="score-def">0</b><span class="shield"></span></div></div>
+  <div id="money"><span class="coin">$</span><span id="money-num">800</span></div>
+  <div id="status-pill" class="ang">— FPS · —</div>
   <div id="bomb-status"></div>
-  <canvas id="minimap" width="160" height="160"></canvas>
+  <div id="mm-panel"><div id="compass"><div id="compass-inner"></div></div><canvas id="minimap" width="154" height="154"></canvas><button id="mm-zoom" title="Toggle minimap zoom">+</button></div>
+  <div id="objective" class="ang" style="display:none"></div>
   <div id="killfeed"></div>
   <div id="radio"></div>
   <div id="banner"></div>

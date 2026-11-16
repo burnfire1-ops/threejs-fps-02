@@ -1,6 +1,6 @@
-// economy.js — money between rounds, and the buy menu (B during freeze).
-// Kill +$300, round win +$3,250, loss +$1,900 with a +$500 loss-streak bonus
-// (max 3). Buying a weapon you own refills its reserve for a quarter price.
+// economy.js — money between rounds, and the buy menu (B during freeze). Kill +$300,
+// round win +$3,250, loss +$1,900 with a +$500 loss-streak bonus (max 3). Buying a
+// weapon you own refills its reserve for a quarter price.
 import { CFG } from './config.js';
 
 export function awardRound(G, winner) {

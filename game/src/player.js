@@ -1,7 +1,5 @@
-// player.js — the human agent: WASD movement with acceleration, crouch,
-// jump, aim (right mouse narrows FOV and steadies the shot), health/armor.
-// Movement resolves against the world's colliders; the camera follows the
-// eyes. Bots reuse the same collision through world.resolveMove.
+// player.js — the human agent: WASD movement with acceleration, crouch, jump, aim (right mouse narrows FOV and steadies the shot), health/armor.
+// Movement resolves against the world's colliders; the camera follows the eyes. Bots reuse the same collision through world.resolveMove.
 import * as THREE from 'three';
 import { CFG } from './config.js';
 import { resolveMove } from './world.js';
@@ -18,20 +16,17 @@ export function createPlayer(world, team = 'atk') {
     weapons: {}, cur: 'pistol',
     crouching: false, aiming: false, onGround: true,
     eyeH: CFG.player.eyeStand, fov: 70,
-    // Recoil recovery (v6-full): the kick from each shot accumulates in
-    // recoilPitch/recoilYaw instead of permanently moving the aim, and
-    // decays back toward zero shortly after the last shot.
+    // Recoil recovery: the kick from each shot accumulates in recoilPitch/recoilYaw
+    // instead of permanently moving the aim, and decays back toward zero shortly after the last shot.
     recoilPitch: 0, recoilYaw: 0, lastShotT: -99,
   };
 }
 
-// Player hitbox (v6-full, fix 4): the shared hitscan raycasts
-// G.shootables, and the player was never in it — only bot body/head
-// meshes were. The probability-roll botShoot in v5 damaged the target
-// directly, so nobody noticed; the moment bots fire the shared hitscan,
-// their rays pass straight through the player and hit nothing. The
-// hitbox is invisible (colorWrite/depthWrite off, so it draws nothing
-// but still raycasts) and follows the player, shrinking when crouched.
+// Player hitbox: the shared hitscan raycasts G.shootables, and the player
+// was never in it — only bot body/head meshes were, so bot rays passed straight
+// through the player and hit nothing. The hitbox is invisible (colorWrite /
+// depthWrite off, so it draws nothing but still raycasts) and follows the
+// player, shrinking when crouched.
 export function createPlayerHitbox(G, p) {
   const mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   const g = new THREE.Group();
@@ -59,11 +54,9 @@ export function stepPlayer(G, dt) {
   const p = G.player;
   const inp = G.input;
   if (!p.alive) {
-    // Spectator camera (v6-full): follow a living teammate instead of
-    // freezing at the death spot. When the watched bot dies, move to the
-    // next living teammate; if none is alive, the camera stays put. This
-    // is presentation only: the sim, death rules and round flow are
-    // untouched.
+    // Spectator camera: follow a living teammate instead of freezing at the death spot.
+    // When the watched bot dies, move to the next living teammate; if none is alive,
+    // the camera stays put. Presentation only: the sim, death rules and round flow are untouched.
     let t = G.spectate;
     if (!t || !t.alive || t.team !== p.team) {
       t = G.bots.find((b) => b.team === p.team && b.alive) ?? null;
@@ -78,8 +71,7 @@ export function stepPlayer(G, dt) {
   }
   if (G.round.state === 'post') return;
   const c = CFG.player;
-  // Freeze time: no movement (CS freeze), but the player can still look
-  // around and use the buy menu.
+  // Freeze time: no movement (CS freeze), but the player can still look around and use the buy menu.
   const frozen = G.round.state === 'freeze';
   // Crouch + aim from input.
   p.crouching = inp.keys.has('ControlLeft') || inp.keys.has('KeyC');
@@ -114,10 +106,8 @@ export function stepPlayer(G, dt) {
   p.yaw -= inp.mouseDX * 0.0022;
   p.pitch = Math.max(-1.5, Math.min(1.5, p.pitch - inp.mouseDY * 0.0022));
   inp.mouseDX = 0; inp.mouseDY = 0;
-  // Recoil recovery: once the player has stopped firing for a beat, the
-  // accumulated kick decays back toward the pre-shot aim. During a spray
-  // the delay never elapses, so recoil still climbs shot after shot
-  // exactly like v5; only the permanent offset is gone.
+  // Recoil recovery: once firing stops for a beat, the accumulated kick decays back toward
+  // the pre-shot aim. During a spray the delay never elapses, so recoil still climbs; only the permanent offset is gone.
   if (G.time - p.lastShotT > 0.12) {
     const rec = Math.exp(-dt * 4);
     p.recoilPitch *= rec;
@@ -128,16 +118,14 @@ export function stepPlayer(G, dt) {
   // Eye height eases between stand and crouch.
   const targetEye = p.crouching ? c.eyeCrouch : c.eyeStand;
   p.eyeH += (targetEye - p.eyeH) * Math.min(1, dt * 12);
-  // Camera follows the eyes; FOV eases when aiming. The recoil offset
-  // rides on top of the mouse aim and recovers with it.
+  // Camera follows the eyes; FOV eases when aiming. The recoil offset rides on top of the mouse aim and recovers with it.
   const cam = G.camera;
   cam.position.set(p.pos.x, p.pos.y + p.eyeH, p.pos.z);
   cam.rotation.set(
     Math.max(-1.5, Math.min(1.5, p.pitch + p.recoilPitch)),
     p.yaw + p.recoilYaw, 0, 'YXZ');
-  // The invisible hitbox follows the player and shrinks when crouched,
-  // so bot hitscan (and the player's own shots, which skip the shooter)
-  // see the same body the bots do.
+  // The invisible hitbox follows the player and shrinks when crouched, so bot hitscan
+  // (and the player's own shots, which skip the shooter) see the same body the bots do.
   if (p.hitbox) {
     p.hitbox.position.copy(p.pos);
     p.hitbox.scale.set(1, p.eyeH / c.eyeStand, 1);

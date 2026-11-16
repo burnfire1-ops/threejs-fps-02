@@ -1,7 +1,6 @@
-// grenade.js — HE and smoke. Thrown with G (HE first, else smoke).
-// HE bursts after a short fuse and hurts through falloff, never through a
-// wall. Smoke blooms where it lands and blocks bot vision for 14 seconds.
-// Both are plain meshes + a timer: no assets, no network.
+// grenade.js — HE and smoke. Thrown with G (HE first, else smoke). HE bursts after
+// a short fuse and hurts through falloff, never through a wall. Smoke blooms where
+// it lands and blocks bot vision for 14 seconds.
 import * as THREE from 'three';
 import { CFG } from './config.js';
 import { damageAgent } from './combat.js';
